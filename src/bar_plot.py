@@ -8,6 +8,7 @@ def generate_bar_plot(
     self_assesment_per_grade: np.ndarray,
     width: int = 900,
     height: int = 400,
+    nbins: int = 5,
     dpi: int = 100,
     fontsize: int = 16,
     background_color=(19 / 255, 20 / 255, 2 / 255),
@@ -52,11 +53,10 @@ def generate_bar_plot(
         ax.spines["bottom"].set_visible(False)
         ax.spines["left"].set_visible(False)
 
-        n_yticks = 5
-        yticks_delta = int(total_max_votes / n_yticks)
-        if total_max_votes % n_yticks > yticks_delta // 2:
+        yticks_delta = int(total_max_votes / nbins)
+        if total_max_votes % nbins > yticks_delta // 2:
             yticks_delta += 1
-        ax.set_yticks([i * yticks_delta for i in range(n_yticks + 1)])
+        ax.set_yticks([i * yticks_delta for i in range(nbins + 1)])
         ax.yaxis.grid()
         ax.yaxis.set_tick_params(labelleft=True)
 
