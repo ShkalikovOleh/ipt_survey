@@ -20,6 +20,7 @@ def generate_bar_plot(
         nrows=1,
         ncols=2,
         facecolor=background_color,
+        sharey=True,
     )
 
     titles = [
@@ -27,6 +28,10 @@ def generate_bar_plot(
         "Самооцінка рівня знань",
     ]
     data = [satisfaction_per_grade, self_assesment_per_grade]
+
+    total_max_votes = max(
+        np.max(satisfaction_per_grade), np.max(self_assesment_per_grade)
+    )
 
     for ax, title, num_per_grade in zip(axs.flat, titles, data):
         ax.set_facecolor(background_color)
@@ -41,18 +46,21 @@ def generate_bar_plot(
 
         ax.bar(np.arange(1, 6), num_per_grade, facecolor="y")
 
+        ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.spines["bottom"].set_visible(False)
         ax.spines["left"].set_visible(False)
 
+        n_yticks = 5
+        yticks_delta = int(total_max_votes / n_yticks)
+        ax.set_yticks([i * yticks_delta for i in range(n_yticks + 1)])
+        ax.yaxis.grid()
+        ax.yaxis.set_tick_params(labelleft=True)
+
         ax.tick_params(axis="x", colors=text_color)
         ax.tick_params(axis="y", colors=text_color)
         ax.title.set_color(text_color)
-        ax.yaxis.get_major_locator().set_params(integer=True)
-        ax.yaxis.grid()
-        ax.set_axisbelow(True)
-
         for item in (
             [ax.title, ax.xaxis.label, ax.yaxis.label]
             + ax.get_xticklabels()

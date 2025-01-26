@@ -1,4 +1,4 @@
-"""Based on the official
+"""Based on the official example
 
 https://matplotlib.org/stable/gallery/specialty_plots/radar_chart.html
 """
