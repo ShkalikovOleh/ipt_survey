@@ -5,14 +5,16 @@ from PIL.ImageFont import FreeTypeFont
 
 
 def get_continue_teaching_color(percent: int) -> tuple[int, int, int]:
-    if percent > 90:
-        return (0, 255, 0)
-    else:
-        return (255, 0, 0)
+    green_intensity = percent / 100
+    red_intensity = (1 - green_intensity) ** 0.5
+    R = int(red_intensity * 255)
+    G = int(green_intensity * 255)
+    return (R, G, 0)
 
 
 def generate_survey_result_picture(
     name: str,
+    position: str,
     per_continue_teaching: int,
     num_response: int,
     max_num_response: int,
@@ -21,6 +23,7 @@ def generate_survey_result_picture(
     bar_plot: Image,
     fonts_map: dict[str, FreeTypeFont],
     color_map: dict[str, tuple],
+    semester_label: str = "2024-2025, I семестр",
 ):
     img = Image.new("RGBA", (1500, 1500), color_map["background"])
 
@@ -35,13 +38,8 @@ def generate_survey_result_picture(
             (95, last_line_ypos), name_lines, color_map["text"], font=fonts_map["name"]
         )
 
-    position_pos = last_line_ypos + 100
-    draw.text(
-        (95, position_pos),
-        "Лектор і практик",
-        color_map["text"],
-        font=fonts_map["text"],
-    )
+    position_pos = last_line_ypos + 60
+    draw.text((95, position_pos), position, color_map["text"], font=fonts_map["text"])
 
     perc_color = get_continue_teaching_color(per_continue_teaching)
     draw.text(
@@ -77,7 +75,7 @@ def generate_survey_result_picture(
     )
     draw.text(
         (95, term_pos),
-        "2024-2024, I семестр",
+        semester_label,
         color_map["text"],
         font=fonts_map["text"],
     )
