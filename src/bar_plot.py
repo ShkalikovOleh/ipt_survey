@@ -72,6 +72,6 @@ def generate_bar_plot(
             item.set_fontsize(fontsize)
 
     if tight_layout:
-        fig.tight_layout()
+        fig.tight_layout(pad=0)
 
     return fig
