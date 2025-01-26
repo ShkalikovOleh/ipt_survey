@@ -3,6 +3,9 @@
 https://matplotlib.org/stable/gallery/specialty_plots/radar_chart.html
 """
 
+from textwrap import wrap
+from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 
 from matplotlib.patches import Circle, RegularPolygon
@@ -103,3 +106,107 @@ def radar_factory(num_vars, frame="circle"):
 
     register_projection(RadarAxes)
     return theta
+
+
+def get_horizontal_alignment(angle: float) -> str:
+    CRITICAL_ANGLE = np.pi / 4
+    if angle <= CRITICAL_ANGLE:
+        h_align = "center"
+    elif angle <= 3 * CRITICAL_ANGLE:
+        h_align = "right"
+    elif angle < 5 * CRITICAL_ANGLE:
+        h_align = "center"
+    elif angle < 7 * CRITICAL_ANGLE:
+        h_align = "left"
+    else:
+        h_align = "center"
+    return h_align
+
+
+def generate_radar_plot(
+    grades: np.ndarray,
+    labels: list[float],
+    r_paddings: list[float] | None = None,
+    theta_paddings: list[float] | None = None,
+    background_color=(19 / 255, 20 / 255, 2 / 255),
+    text_color="white",
+    font_size: int = 16,
+    plot_color="y",
+    size=900,
+    dpi=100,
+    start_with_grade_two: bool = False,
+    plot_scale: bool = True,
+    tight_layout: bool = True,
+) -> Figure:
+    N = len(grades)
+
+    if not r_paddings:
+        r_paddings = [0] * N
+    if not theta_paddings:
+        theta_paddings = [0] * N
+
+    # Prepare graph layout
+    thetas = radar_factory(N, frame="polygon")
+    fig = plt.figure(
+        figsize=(size / dpi, size / dpi), dpi=dpi, facecolor=background_color
+    )
+    ax = plt.axes(projection="radar", facecolor=background_color)
+
+    # Ensure scale (r axis labels) will be visible
+    ax.set_ylim(0, 1)
+    ax.set_axisbelow(True)
+    ax.set_yticklabels([])
+    for _, spine in ax.spines.items():
+        spine.set_zorder(0.5)
+        spine.set_linewidth(2)
+        spine.set_color(text_color)
+
+    # Adjust radial axes lines
+    ax.get_xaxis().set_visible(False)
+    num_levels = 5 - start_with_grade_two
+    ax.set_rticks(np.arange(1, num_levels + 1) / num_levels)
+
+    # Plot r axis label (with proper occlusion)
+    first_r_axis = 1 / num_levels - 0.03
+    for level in range(1, num_levels + 1):
+        r = level / num_levels - 0.03
+        angle = 0.15 * first_r_axis / r
+        ax.text(
+            angle,
+            r,
+            str(level + start_with_grade_two),
+            zorder=1,
+            color=text_color,
+            backgroundcolor=background_color,
+            fontsize=font_size,
+        )
+
+    # Plot lines betweew
+    if plot_scale:
+        grid_color = ax.get_ygridlines()[0].get_color()
+        for theta in thetas:
+            ax.plot([theta, theta], [0, 1], color=grid_color, zorder=0.75)
+
+    # Plot radar graph
+    scaled_grades = (grades - start_with_grade_two) / (5 - start_with_grade_two)
+    ax.plot(thetas, scaled_grades, color=plot_color)
+    ax.fill(thetas, scaled_grades, facecolor=plot_color, alpha=0.25, label="_nolegend_")
+
+    labels = ["\n".join(wrap(label, 20)) for label in labels]
+    for label, angle, r_pad, theta_pad in zip(
+        labels, thetas, r_paddings, theta_paddings
+    ):
+        h_align = get_horizontal_alignment(angle)
+        ax.text(
+            angle + theta_pad,
+            1 + r_pad,
+            label,
+            horizontalalignment=h_align,
+            color=text_color,
+            fontsize=font_size,
+        )
+
+    if tight_layout:
+        fig.tight_layout()
+
+    return fig
