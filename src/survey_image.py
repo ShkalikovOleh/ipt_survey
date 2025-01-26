@@ -23,27 +23,38 @@ def generate_survey_result_picture(
     bar_plot: Image,
     fonts_map: dict[str, FreeTypeFont],
     color_map: dict[str, tuple],
+    width: int = 1500,
+    height: int = 1500,
+    name_num_wrap: int = 16,
+    margin: int = 95,
+    gap_left_right_part: int = 25,
+    gap_plots: int = 10,
     semester_label: str = "2024-2025, I семестр",
 ):
-    img = Image.new("RGBA", (1500, 1500), color_map["background"])
+    img = Image.new("RGBA", (width, height), color_map["background"])
 
-    img.paste(photo, (95, 95))
-    img.paste(spider_plot, (95 + 400 + 50, 95))
-    img.paste(bar_plot, (95 + 400 + 50, 95 + 900 + 10))
+    img.paste(photo, (margin, margin))
+    img.paste(spider_plot, (margin + 400 + gap_left_right_part, margin - 75))
+    img.paste(bar_plot, (margin + 400 + gap_left_right_part, margin + 900 + gap_plots))
 
     draw = ImageDraw.Draw(img)
-    for i, name_lines in enumerate(wrap(name, 16)):
-        last_line_ypos = 400 + 95 + 20 + i * 40
+    for i, name_lines in enumerate(wrap(name, name_num_wrap)):
+        last_line_ypos = 400 + margin + 20 + i * 40
         draw.text(
-            (95, last_line_ypos), name_lines, color_map["text"], font=fonts_map["name"]
+            (margin, last_line_ypos),
+            name_lines,
+            color_map["text"],
+            font=fonts_map["name"],
         )
 
     position_pos = last_line_ypos + 60
-    draw.text((95, position_pos), position, color_map["text"], font=fonts_map["text"])
+    draw.text(
+        (margin, position_pos), position, color_map["text"], font=fonts_map["text"]
+    )
 
     perc_color = get_continue_teaching_color(per_continue_teaching)
     draw.text(
-        (95, position_pos + 200),
+        (margin, position_pos + 200),
         f"{per_continue_teaching}%",
         perc_color,
         font=fonts_map["percent"],
@@ -54,30 +65,27 @@ def generate_survey_result_picture(
     ):
         last_desc_line_pos = position_pos + 300 + i * 40
         draw.text(
-            (95, last_desc_line_pos),
+            (margin, last_desc_line_pos),
             desc_line,
             color_map["text"],
             font=fonts_map["text"],
         )
 
-    term_pos = 1500 - 95 - 40
+    term_pos = height - margin - 40
     draw.text(
-        (95, term_pos - 170),
+        (margin, term_pos - 170),
         f"{num_response}/{max_num_response}",
         color_map["text"],
         font=fonts_map["num_resp"],
     )
     draw.text(
-        (95, term_pos - 100),
+        (margin, term_pos - 100),
         "кількість опитаних",
         color_map["text"],
         font=fonts_map["text"],
     )
     draw.text(
-        (95, term_pos),
-        semester_label,
-        color_map["text"],
-        font=fonts_map["text"],
+        (margin, term_pos), semester_label, color_map["text"], font=fonts_map["text"]
     )
 
     return img
