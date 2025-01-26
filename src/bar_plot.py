@@ -6,9 +6,9 @@ import numpy as np
 def generate_bar_plot(
     satisfaction_per_grade: np.ndarray,
     self_assesment_per_grade: np.ndarray,
+    max_ytiks: int = 5,
     width: int = 900,
     height: int = 400,
-    nbins: int = 5,
     dpi: int = 100,
     fontsize: int = 16,
     background_color=(19 / 255, 20 / 255, 2 / 255),
@@ -47,22 +47,23 @@ def generate_bar_plot(
 
         ax.bar(np.arange(1, 6), num_per_grade, facecolor="y")
 
-        ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.spines["bottom"].set_visible(False)
         ax.spines["left"].set_visible(False)
 
-        yticks_delta = int(total_max_votes / nbins)
-        if total_max_votes % nbins > yticks_delta // 2:
-            yticks_delta += 1
-        ax.set_yticks([i * yticks_delta for i in range(nbins + 1)])
-        ax.yaxis.grid()
-        ax.yaxis.set_tick_params(labelleft=True)
-
         ax.tick_params(axis="x", colors=text_color)
         ax.tick_params(axis="y", colors=text_color)
         ax.title.set_color(text_color)
+
+        yticks_delta = np.ceil(total_max_votes / max_ytiks)
+        add_top_line = (yticks_delta * max_ytiks - 1) < total_max_votes
+        ax.set_yticks([i * yticks_delta for i in range(max_ytiks + add_top_line)])
+        ax.yaxis.grid()
+        ax.yaxis.set_tick_params(labelleft=True)
+
+        ax.set_axisbelow(True)
+
         for item in (
             [ax.title, ax.xaxis.label, ax.yaxis.label]
             + ax.get_xticklabels()
