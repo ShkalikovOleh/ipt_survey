@@ -6,7 +6,7 @@ from PIL.ImageFont import FreeTypeFont
 
 def get_continue_teaching_color(percent: int) -> tuple[int, int, int]:
     green_intensity = percent / 100
-    red_intensity = (1 - green_intensity) ** 0.5
+    red_intensity = (1 - green_intensity) ** 0.3
     R = int(red_intensity * 255)
     G = int(green_intensity * 255)
     return (R, G, 0)
