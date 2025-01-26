@@ -192,11 +192,14 @@ def generate_radar_plot(
     ax.plot(thetas, scaled_grades, color=plot_color)
     ax.fill(thetas, scaled_grades, facecolor=plot_color, alpha=0.25, label="_nolegend_")
 
-    labels = ["\n".join(wrap(label, 20)) for label in labels]
     for label, angle, r_pad, theta_pad in zip(
         labels, thetas, r_paddings, theta_paddings
     ):
         h_align = get_horizontal_alignment(angle)
+        if h_align == "center":
+            label = "\n".join(wrap(label, 20))
+        else:
+            label = "\n".join(wrap(label, 15))
         ax.text(
             angle + theta_pad,
             1 + r_pad,
