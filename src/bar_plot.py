@@ -54,6 +54,8 @@ def generate_bar_plot(
 
         n_yticks = 5
         yticks_delta = int(total_max_votes / n_yticks)
+        if total_max_votes % n_yticks > yticks_delta // 2:
+            yticks_delta += 1
         ax.set_yticks([i * yticks_delta for i in range(n_yticks + 1)])
         ax.yaxis.grid()
         ax.yaxis.set_tick_params(labelleft=True)
