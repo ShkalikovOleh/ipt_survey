@@ -108,5 +108,34 @@ def merge_course(year, department, course, curr_course):
 
 def merge_course_info(course, curr_course):
     curr_course.num_students += course.num_students
-    curr_course.is_elective = min(curr_course.is_elective, course.is_elective)
+    curr_course.is_elective = max(curr_course.is_elective, course.is_elective)
     curr_course.role |= course.role
+
+
+def load_teacher_db(paths: list[str]):
+    teacher_db = {}
+    for path in paths:
+        year, dep, data = parse_teacher_json(path)
+        add_to_db(teacher_db, data, year, dep)
+
+    return teacher_db
+
+
+def nan_or(arg1, arg2):
+    if arg1 is None:
+        return arg2
+    return arg1 | arg2
+
+
+def get_teacher_with_max_role_for_year(
+    teacher_db: dict[str, dict[str, Course]], year: int
+):
+    results = {}
+    for teacher_name, courses in teacher_db.items():
+        max_role = None
+        for course_name, course in courses.items():
+            if year in course.years:
+                max_role = nan_or(max_role, course.role)
+        if max_role is not None:
+            results[teacher_name] = max_role
+    return results
