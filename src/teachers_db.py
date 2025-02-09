@@ -10,16 +10,27 @@ class Role(Flag):
 
 
 @dataclass
-class Course:
-    name: str
-    years: list[int]
-    departments: list[str]
+class Audience:
+    year: int
+    department: str
     is_elective: bool
-    role: Role
     num_students: int
 
     def __post_init__(self):
         assert self.num_students > 0
+
+
+@dataclass
+class Course:
+    name: str
+    audiences: list[Audience]
+    role: Role
+
+    @property
+    def total_num_students(self) -> int:
+        return sum(map(lambda aud: aud.num_students, self.audiences))
+
+    def __post_init__(self):
         assert len(self.name.split()) > 1
 
 
@@ -42,11 +53,15 @@ def parse_courses(
 
         course = Course(
             name,
-            [year],
-            [department],
-            course_info["is_elective"],
+            [
+                Audience(
+                    year,
+                    department,
+                    course_info["is_elective"],
+                    course_info["num_students"],
+                )
+            ],
             role,
-            course_info["num_students"],
         )
 
         if name in courses:
@@ -64,7 +79,6 @@ def parse_teacher_json(path: str):
     assert year in range(1, 5)
 
     department = data["department"]
-    assert department in ["ММАД", "ММЗІ"]
 
     teachers = {
         info["name"]: parse_courses(info["courses"], year, department)
@@ -77,8 +91,6 @@ def parse_teacher_json(path: str):
 def add_to_db(
     teacher_db: dict[str, dict[str, Course]],
     new_data: dict[str, dict[str, Course]],
-    year: int,
-    department: str,
 ):
     for teacher_name, courses in new_data.items():
         curr_teacher_courses = teacher_db.get(teacher_name, None)
@@ -86,30 +98,12 @@ def add_to_db(
             for course_name, course in courses.items():
                 curr_course = curr_teacher_courses.get(course_name, None)
                 if course_name in curr_teacher_courses:
-                    merge_course(year, department, course, curr_course)
+                    curr_course.audiences.extend(course.audiences)
+                    curr_course.role |= course.role
                 else:
                     curr_teacher_courses[course_name] = course
         else:
             teacher_db[teacher_name] = courses
-
-
-def merge_course(year, department, course, curr_course):
-    if year not in curr_course.years:
-        curr_course.years.append(year)
-        merge_course_info(course, curr_course)
-    elif department not in curr_course.departments:
-        curr_course.departments.append(department)
-        merge_course_info(course, curr_course)
-    elif curr_course.num_students != course.num_students:
-        raise AssertionError(
-            "Course is duplicated but number of students are different"
-        )
-
-
-def merge_course_info(course, curr_course):
-    curr_course.num_students += course.num_students
-    curr_course.is_elective = max(curr_course.is_elective, course.is_elective)
-    curr_course.role |= course.role
 
 
 def load_teacher_db(paths: list[str]):
@@ -134,8 +128,9 @@ def get_teacher_with_max_role_for_year(
     for teacher_name, courses in teacher_db.items():
         max_role = None
         for course_name, course in courses.items():
-            if year in course.years:
-                max_role = nan_or(max_role, course.role)
+            for aud in course.audiences:
+                if year == aud.year:
+                    max_role = nan_or(max_role, course.role)
         if max_role is not None:
             results[teacher_name] = max_role
     return results

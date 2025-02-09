@@ -93,6 +93,7 @@ def get_gapi_credentials(cred_file: str, token_store_file: str):
     if not creds or creds.invalid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            store.put(creds)
         else:
             flow = client.flow_from_clientsecrets(cred_file, SCOPES)
             creds = tools.run_flow(flow, store)
