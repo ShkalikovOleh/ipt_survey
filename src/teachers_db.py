@@ -1,6 +1,10 @@
+from collections import defaultdict
 import json
-from enum import Flag, auto
+from enum import Enum, Flag, auto
 from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
 
 
 class Role(Flag):
@@ -134,3 +138,102 @@ def get_teacher_with_max_role_for_year(
         if max_role is not None:
             results[teacher_name] = max_role
     return results
+
+
+class PreciseEnum(Enum):
+    MANY_ELECTIVES = 0
+    ONE_ELECTIVES = 1
+    PRECISE = 2
+
+
+enum2bool = {
+    PreciseEnum.MANY_ELECTIVES: False,
+    PreciseEnum.ONE_ELECTIVES: True,
+    PreciseEnum.PRECISE: True,
+}
+
+
+def calculate_total_num_students_for_year(
+    teacher_db: dict[str, dict[str, Course]], year: int
+):
+    total_nums = defaultdict(lambda: 0)
+    precise_res = defaultdict(lambda: True)
+    for teacher_name, courses in teacher_db.items():
+        num_by_dep = {}
+        precise_by_dep = {}
+        for course in courses.values():
+            for aud in course.audiences:
+                if aud.year != year:
+                    continue
+
+                dep = aud.department
+                if dep not in num_by_dep:  # no prev info
+                    num_by_dep[dep] = aud.num_students
+                    precise_by_dep[dep] = (
+                        PreciseEnum.PRECISE
+                        if aud.is_elective
+                        else PreciseEnum.ONE_ELECTIVES
+                    )
+                elif precise_by_dep == PreciseEnum.PRECISE:  # already known
+                    continue
+                elif not aud.is_elective:
+                    num_by_dep[dep] = aud.num_students
+                    precise_by_dep[dep] = PreciseEnum.PRECISE
+                else:
+                    num_by_dep[dep] = max(aud.num_students, num_by_dep[dep])
+                    precise_by_dep[dep] = PreciseEnum.MANY_ELECTIVES
+
+        if num_by_dep:  # not empty
+            is_precise = np.logical_and.reduce(
+                [enum2bool[it] for it in (precise_by_dep.values())]
+            )
+            total_nums[teacher_name] = sum(num_by_dep.values())
+            precise_res[teacher_name] = is_precise
+
+    return total_nums, precise_res
+
+
+def build_question2item_id_map(id: str, form_service):
+    cur_form = form_service.forms().get(formId=id).execute()
+
+    def is_question(item) -> bool:
+        return "questionItem" in item
+
+    questions = filter(is_question, cur_form["items"])
+
+    mapping = {
+        item["title"]: item["questionItem"]["question"]["questionId"]
+        for item in questions
+    }
+    return mapping
+
+
+def response_json_to_pandas(
+    responses,
+    teacher_name: str,
+    year: int,
+    question2id: dict[str, str],
+    column2parser: list[str],
+) -> pd.DataFrame:
+    data = {}
+    N = len(responses["responses"])
+    data["name"] = [teacher_name] * N
+    data["year"] = [year] * N
+
+    for column, parser in column2parser.items():
+        qId = question2id.get(column)
+        values = []
+        if qId is not None:
+            for response in responses["responses"]:
+                answer = response["answers"].get(qId)
+                if answer:
+                    values.append(parser(answer["textAnswers"]["answers"][0]["value"]))
+                else:
+                    values.append(np.nan)
+        else:
+            values = [np.nan] * len(responses["responses"])
+
+        data[column] = values
+
+    df = pd.DataFrame.from_dict(data)
+    return df

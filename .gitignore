@@ -172,3 +172,5 @@ cython_debug/
 
 notebooks
 .vscode
+credentials.json
+photos
