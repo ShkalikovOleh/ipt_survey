@@ -27,15 +27,20 @@ def generate_survey_result_picture(
     height: int = 1500,
     name_num_wrap: int = 16,
     margin: int = 95,
+    gap_spider_top: int = 0,
     gap_left_right_part: int = 25,
-    gap_plots: int = 10,
     semester_label: str = "2024-2025, I семестр",
 ):
     img = Image.new("RGBA", (width, height), color_map["background"])
 
     img.paste(photo, (margin, margin))
-    img.paste(spider_plot, (margin + 400 + gap_left_right_part, margin - 75))
-    img.paste(bar_plot, (margin + 400 + gap_left_right_part, margin + 900 + gap_plots))
+    img.paste(
+        spider_plot, (margin + 400 + gap_left_right_part, margin - 75 + gap_spider_top)
+    )
+    img.paste(
+        bar_plot,
+        (margin + 400 + gap_left_right_part, height - margin - 400),
+    )
 
     draw = ImageDraw.Draw(img)
     for i, name_lines in enumerate(wrap(name, name_num_wrap)):
@@ -52,9 +57,10 @@ def generate_survey_result_picture(
         (margin, position_pos), position, color_map["text"], font=fonts_map["text"]
     )
 
+    perc_pos = height - 550 - margin
     perc_color = get_continue_teaching_color(per_continue_teaching)
     draw.text(
-        (margin, position_pos + 200),
+        (margin, perc_pos),
         f"{per_continue_teaching}%",
         perc_color,
         font=fonts_map["percent"],
@@ -63,7 +69,7 @@ def generate_survey_result_picture(
     for i, desc_line in enumerate(
         wrap("опитаних хочуть, щоб викладач продовжив викладати", 20)
     ):
-        last_desc_line_pos = position_pos + 300 + i * 40
+        last_desc_line_pos = perc_pos + 100 + i * 40
         draw.text(
             (margin, last_desc_line_pos),
             desc_line,

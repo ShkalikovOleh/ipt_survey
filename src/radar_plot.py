@@ -210,6 +210,6 @@ def generate_radar_plot(
         )
 
     if tight_layout:
-        fig.tight_layout(pad=0)
+        fig.tight_layout(pad=0.1)
 
     return fig

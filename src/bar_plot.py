@@ -10,7 +10,7 @@ def generate_bar_plot(
     width: int = 900,
     height: int = 400,
     dpi: int = 100,
-    fontsize: int = 16,
+    fontsize: int = 18,
     background_color=(19 / 255, 20 / 255, 2 / 255),
     text_color="white",
     tight_layout: bool = True,
@@ -43,6 +43,7 @@ def generate_bar_plot(
             y=-0.2,
             horizontalalignment="center",
             verticalalignment="top",
+            fontsize=fontsize + 2,
         )
 
         ax.bar(np.arange(1, 6), num_per_grade, facecolor="y")
@@ -57,8 +58,8 @@ def generate_bar_plot(
         ax.title.set_color(text_color)
 
         yticks_delta = np.ceil(total_max_votes / max_ytiks)
-        add_top_line = (yticks_delta * max_ytiks - 1) < total_max_votes
-        ax.set_yticks([i * yticks_delta for i in range(max_ytiks + add_top_line)])
+        ytiks = int(np.ceil(total_max_votes / yticks_delta))
+        ax.set_yticks([i * yticks_delta for i in range(ytiks + 1)])
         ax.yaxis.grid()
         ax.yaxis.set_tick_params(labelleft=True)
 
