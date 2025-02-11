@@ -6,6 +6,7 @@ import random
 from typing import TypeVar
 import dateutil.parser
 import pandas as pd
+import pytz
 from telegram import Update
 from telegram.ext import ContextTypes, Application, MessageHandler, filters
 import datetime
@@ -65,7 +66,8 @@ async def post_next_teacher_results(
     min_working_hour: int,
     max_working_hour: int,
 ):
-    curr_hour = datetime.datetime.now().hour
+    tmzinfo = pytz.timezone("Europe/Kyiv")
+    curr_hour = datetime.datetime.now(tmzinfo).hour
     if curr_hour < min_working_hour or curr_hour >= max_working_hour:
         return
 
