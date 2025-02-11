@@ -204,7 +204,7 @@ def run_bot(
     job_queue.run_repeating(post_func, interval=interval_min * 60, first=first)
 
     channel_post_handler = MessageHandler(
-        filters.User(777000),  # TG_ID
+        filters.User(777000) & filters.Caption(),  # TG_ID
         comment_func,
     )
     application.add_handler(channel_post_handler)
