@@ -1,0 +1,20 @@
+{
+    "TG_TOKEN": "",
+    "channel_id": "@ipt_bee",
+    "teachers_info_files": [
+        "data/year_1_mmad.json",
+        "data/year_1_mmzi.json",
+        "data/year_2_mmzi.json",
+        "data/year_2_mmad.json",
+        "data/year_3_mmad.json",
+        "data/year_3_mmzi.json"
+    ],
+    "survey_results": "data/survey_results_aggregated.arrow",
+    "viz_folder": "ankets",
+    "start_time": "'2025-02-11T17:00:00.000Z'",
+    "interval_min": 15,
+    "working_hours": {
+        "min": 16,
+        "max": 21
+    }
+}
