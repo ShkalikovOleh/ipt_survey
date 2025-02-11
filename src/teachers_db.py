@@ -13,6 +13,13 @@ class Role(Flag):
     both = practice | lecturer
 
 
+role_to_str = {
+    Role.lecturer: "Лектор",
+    Role.practice: "Практик",
+    Role.both: "Лектор і практик",
+}
+
+
 @dataclass
 class Audience:
     year: int

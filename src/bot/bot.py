@@ -1,5 +1,7 @@
 from argparse import ArgumentParser, Namespace
 import json
+import os
+import random
 import dateutil.parser
 import pandas as pd
 from telegram import Update
@@ -9,7 +11,31 @@ import dateutil
 import time
 
 
-from src.teachers_db import Course, add_to_db, parse_teacher_json
+from src.teachers_db import Course, add_to_db, parse_teacher_json, role_to_str
+
+
+def batched(iterable, n):
+    current_batch = []
+    for item in iterable:
+        current_batch.append(item)
+        if len(current_batch) == n:
+            yield current_batch
+            current_batch = []
+    if current_batch:
+        yield current_batch
+
+
+N_BATCH = 4
+col2desc = {
+    "Які позитивні риси є у викладача (такі, що можна порекомендувати іншим викладачам)?": "Які позитивні риси є у викладача?",
+    "Поради для студентів. Що краще робити (чи навпаки, не робити) для побудови гарних відносин із викладачем, які характерні особливості є у викладача, про які ви вважаєте варто знати тим, хто буде у нього вчитись?": "Поради для студентів.",
+    "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт": "Відкритий мікрофон.",
+}
+col2emoji = {
+    "Які позитивні риси є у викладача (такі, що можна порекомендувати іншим викладачам)?": "💚",
+    "Поради для студентів. Що краще робити (чи навпаки, не робити) для побудови гарних відносин із викладачем, які характерні особливості є у викладача, про які ви вважаєте варто знати тим, хто буде у нього вчитись?": "🤝",
+    "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт": "📢",
+}
 
 
 async def post_next_teacher_results(
@@ -17,11 +43,30 @@ async def post_next_teacher_results(
     channel_id: str,
     viz_folder: str,
     teachers_db: dict[str, dict[str, Course]],
+    df: pd.DataFrame,
     min_working_hour: int,
     max_working_hour: int,
 ):
-    teacher_name = "Завадська Людмила Олексіївна"
-    caption = f"{teacher_name}\n fdas"
+    curr_hour = datetime.datetime.now().hour
+    if curr_hour < min_working_hour or curr_hour >= max_working_hour:
+        return
+
+    shuffled_keys = df.index.to_list()
+    random.Random(42).shuffle(shuffled_keys)
+
+    if os.path.exists("pers_state.json"):
+        with open("pers_state.json", "r") as pers_state_file:
+            curr_pos = json.load(pers_state_file)["curr_pos"]
+    else:
+        curr_pos = 0
+
+    teacher_name = shuffled_keys[curr_pos]
+
+    caption = f"{teacher_name}\n"
+    marks = "🔹🔸"
+    for idx, (course_name, course) in enumerate(teachers_db[teacher_name].items()):
+        mark = marks[idx % 2]
+        caption += f"\n{mark} {course_name} - {role_to_str[course.role]}"
 
     await context.bot.send_photo(
         chat_id=channel_id,
@@ -29,6 +74,9 @@ async def post_next_teacher_results(
         caption=caption,
         parse_mode="html",
     )
+
+    with open("pers_state.json", "w") as pers_state_file:
+        json.dump({"curr_pos": curr_pos + 1}, pers_state_file)
 
 
 async def add_comments(
@@ -47,22 +95,19 @@ async def add_comments(
         for col in columns[:1]:
             await post_comment(update, context, data, col)
 
-        for answer in data["drawbacks_merged"]:
-            critic, sugg = answer
+        for answers in batched(data["drawbacks_merged"], N_BATCH):
+            comment = (
+                "<blockquote>Які недоліки є у викладанні?</blockquote>\n"
+                "<blockquote>Які шляхи їх вирішення ви бачите?</blockquote>\n"
+            )
+            for answer in answers:
+                critic, sugg = answer
 
-            if isinstance(critic, str):
-                comment = (
-                    "<blockquote>Які недоліки є у викладанні?</blockquote>\n"
-                    + critic
-                    + "\n\n"
-                )
-            else:
-                comment = ""
-            if isinstance(sugg, str):
-                comment += (
-                    "<blockquote>Які шляхи їх вирішення ви бачите?</blockquote>\n"
-                    + sugg
-                )
+                comment += "\n"
+                if isinstance(critic, str):
+                    comment += f"🔴 {critic}\n"
+                if isinstance(sugg, str):
+                    comment += f"➡️ {sugg}\n"
 
             time.sleep(4)
             await context.bot.send_message(
@@ -76,9 +121,16 @@ async def add_comments(
             await post_comment(update, context, data, col)
 
 
-async def post_comment(update, context, data, col):
-    for answer in data[col]:
-        comment = f"<blockquote>{col}</blockquote>\n" + answer
+async def post_comment(
+    update,
+    context,
+    data,
+    col: str,
+):
+    for answers in batched(data[col], N_BATCH):
+        comment = f"<blockquote>{col2desc[col]}</blockquote>"
+        for answer in answers:
+            comment += f"\n\n{col2emoji[col]} {answer}"
 
         await context.bot.send_message(
             chat_id=update.message.chat_id,
@@ -111,6 +163,7 @@ def run_bot(
             channel_id=channel_id,
             viz_folder=viz_folder,
             teachers_db=teachers_db,
+            df=df,
             min_working_hour=min_working_hour,
             max_working_hour=max_working_hour,
         )
