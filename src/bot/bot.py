@@ -1,7 +1,9 @@
 from argparse import ArgumentParser, Namespace
+from collections.abc import Generator, Iterable, Mapping
 import json
 import os
 import random
+from typing import TypeVar
 import dateutil.parser
 import pandas as pd
 from telegram import Update
@@ -14,7 +16,10 @@ import time
 from src.teachers_db import Course, add_to_db, parse_teacher_json, role_to_str
 
 
-def batched(iterable, n):
+T = TypeVar("T")
+
+
+def batched(iterable: Iterable[T], n) -> Generator[T]:
     current_batch = []
     for item in iterable:
         current_batch.append(item)
@@ -36,6 +41,19 @@ col2emoji = {
     "Поради для студентів. Що краще робити (чи навпаки, не робити) для побудови гарних відносин із викладачем, які характерні особливості є у викладача, про які ви вважаєте варто знати тим, хто буде у нього вчитись?": "🤝",
     "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт": "📢",
 }
+foul2stars = {
+    "хуя": "х**",
+    "підор": "п****",
+    "нахуй": "н****",
+    "бля": "б**",
+    "сука": "с***",
+}
+
+
+def filter_foul_language(comment: str):
+    for foul, star in foul2stars.items():
+        comment = comment.replace(foul, star)
+    return comment
 
 
 async def post_next_teacher_results(
@@ -59,6 +77,9 @@ async def post_next_teacher_results(
             curr_pos = json.load(pers_state_file)["curr_pos"]
     else:
         curr_pos = 0
+
+    if curr_pos > len(shuffled_keys):
+        return
 
     teacher_name = shuffled_keys[curr_pos]
 
@@ -105,9 +126,9 @@ async def add_comments(
 
                 comment += "\n"
                 if isinstance(critic, str):
-                    comment += f"🔴 {critic}\n"
+                    comment += f"🔴 {filter_foul_language(critic.rstrip())}\n"
                 if isinstance(sugg, str):
-                    comment += f"➡️ {sugg}\n"
+                    comment += f"➡️ {filter_foul_language(sugg.rstrip())}\n"
 
             time.sleep(4)
             await context.bot.send_message(
@@ -122,15 +143,15 @@ async def add_comments(
 
 
 async def post_comment(
-    update,
-    context,
-    data,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    data: Mapping[str, str],
     col: str,
 ):
     for answers in batched(data[col], N_BATCH):
         comment = f"<blockquote>{col2desc[col]}</blockquote>"
         for answer in answers:
-            comment += f"\n\n{col2emoji[col]} {answer}"
+            comment += f"\n\n{col2emoji[col]} {filter_foul_language(answer.rstrip())}"
 
         await context.bot.send_message(
             chat_id=update.message.chat_id,
