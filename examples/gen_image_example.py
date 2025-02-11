@@ -2,7 +2,7 @@ import numpy as np
 from src.viz.bar_plot import generate_bar_plot
 from src.viz.radar_plot import generate_radar_plot
 from src.viz.survey_image import generate_survey_result_picture
-from src.utils import convert_matplotlib_fig_to_image
+from src.viz.utils import convert_matplotlib_fig_to_image
 
 from PIL import ImageFont
 from PIL import Image
