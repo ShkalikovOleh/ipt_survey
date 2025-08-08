@@ -130,10 +130,6 @@ class Teacher:
         return set(chain.from_iterable(c.streams for c in self.courses))
 
     @property
-    def roles(self) -> Collection[Role]:
-        return set(chain.from_iterable(c.roles for c in self.courses))
-
-    @property
     def max_role(self) -> Role:
         return reduce(operator.or_, [c.max_role for c in self.courses])
 
@@ -143,6 +139,28 @@ class Teacher:
 
     def max_role_for_group(self, group: str) -> Optional[Role]:
         return self.__max_role_for(lambda aud: aud.group == group)
+
+    @property
+    def roles(self) -> Collection[Role]:
+        all_roles = set()
+        all_audiences = list(aud for c in self.courses for aud in c.audiences)
+        for group in self.groups:
+            if len(all_roles) == 3:
+                break
+
+            group_auds = list(filter(lambda aud: aud.group == group, all_audiences))
+            mandatory_auds = filter(lambda aud: not aud.is_elective, group_auds)
+            role = reduce(nan_or, (aud.role for aud in mandatory_auds), None)
+            if role:
+                all_roles.add(role)
+            if role != Role.BOTH:
+                elective_auds_new_roles = filter(
+                    lambda aud: aud.is_elective and aud.role != role, group_auds
+                )
+                for aud in elective_auds_new_roles:
+                    all_roles.add(aud.role)
+
+        return all_roles
 
     def max_role_for_spec(self, speciality: Speciality) -> Optional[Role]:
         return self.__max_role_for(lambda aud: aud.speciality == speciality)
@@ -285,4 +303,4 @@ class TeacherDB:
         )
 
     def __iter__(self) -> Iterator[Teacher]:
-        return self.db.values()
+        return iter(self.db.values())
