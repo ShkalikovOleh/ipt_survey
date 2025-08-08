@@ -37,11 +37,11 @@ def adapt_form_from_template(
         for i, item in enumerate(form["items"])
         if "pageBreakItem" in item
     ]  # [(loc, id)]
-    section_roles = [Role.PRACTICE, Role.LECTURER, Role.BOTH]
     assert len(section_itemids) == 3, "Expected 3 section for optional questions"
 
-    roles = teacher.roles
+    section_roles = [Role.PRACTICE, Role.LECTURER, Role.BOTH]
     requests = []
+    roles = teacher.roles
     if len(roles) == 1:
         role = teacher.max_role
         if not insert_loc:
@@ -56,34 +56,38 @@ def adapt_form_from_template(
                 max_loc,
             )
 
-        irole = section_roles.index(role)
-        start_sec_loc = section_itemids[irole][0]
-        end_sec_loc = section_itemids[irole + 1][0] if irole < 2 else max_loc
+        idx_role = section_roles.index(role)
+        start_sec_loc = section_itemids[idx_role][0]
+        end_sec_loc = section_itemids[idx_role + 1][0] if idx_role < 2 else max_loc
         for loc in range(start_sec_loc + 1, end_sec_loc):
             move_item(loc, insert_loc, requests)
+            insert_loc += 1
 
-        new_start_optional = section_itemids[0][0] + end_sec_loc - start_sec_loc - 1
-        for i in range(new_start_optional, max_loc):
+        redudant_sec_loc = section_itemids[0][0] + end_sec_loc - start_sec_loc - 1
+        for i in range(redudant_sec_loc, max_loc):
             delete_item(
-                new_start_optional, requests
+                redudant_sec_loc, requests
             )  # bug with location in GoogleFormsAPI (after every delete loc changes)
     else:
-        options_to_nextid: dict[str, str] = {}
-        for srole, (loc, id) in zip(section_roles, section_itemids):
-            if srole in roles:
-                options_to_nextid[str(srole)] = id
+        options_to_nextid = {
+            str(srole): item_id
+            for srole, (_, item_id) in zip(section_roles, section_itemids)
+            if srole in roles
+        }
         append_branching_question(
             "Ким для вас був цей викладач?", options_to_nextid, requests
         )
 
-        for i, srole in enumerate(section_roles):
-            if srole not in roles:
-                start_sec_loc = section_itemids[i][0]
-                end_sec_loc = section_itemids[i + 1][0] if i < 2 else max_loc
-                for _ in range(start_sec_loc, end_sec_loc):
-                    delete_item(
-                        start_sec_loc + 1, requests
-                    )  # bug with location in GoogleFormsAPI (after every delete loc changes)
+        sections_to_delete = [
+            i for i, srole in enumerate(section_roles) if srole not in roles
+        ]
+        for i in sections_to_delete:
+            start_sec_loc = section_itemids[i][0]
+            end_sec_loc = section_itemids[i + 1][0] if i < 2 else max_loc
+            for _ in range(start_sec_loc, end_sec_loc):
+                delete_item(
+                    start_sec_loc + 1, requests
+                )  # bug with location in GoogleFormsAPI (after every delete loc changes)
 
     update_form_body(requests, forms_service, form_id, ret_form=False)
     return form_id, form["responderUri"]

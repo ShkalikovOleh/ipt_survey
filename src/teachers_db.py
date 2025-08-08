@@ -240,13 +240,12 @@ class TeacherDB:
 
             if teacher_name in self.db:
                 teacher = self.db[teacher_name]
-                teacher.student_per_group[group] = total_students
-
                 if group in teacher.groups:
                     warn(
                         f"Info about group {group} for {teacher_name} has already been added before"
                     )
 
+                teacher.student_per_group[group] = total_students
                 for course in teacher.courses:
                     if course.name in course2audience:
                         if group in course.groups:
@@ -284,7 +283,7 @@ class TeacherDB:
                 auds = list(filter(predicate, course.audiences))
                 if auds:
                     filtered_courses.append(Course(course.name, audiences=auds))
-                    groups.union(aud.group for aud in auds)
+                    groups = groups.union(aud.group for aud in auds)
             if filtered_courses:
                 new_num_stud = {g: teacher.student_per_group[g] for g in groups}
                 yield Teacher(teacher.name, filtered_courses, new_num_stud)
