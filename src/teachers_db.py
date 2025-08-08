@@ -1,199 +1,288 @@
-from collections import defaultdict
-import json
-from enum import Enum, Flag, auto
+import operator
+from collections.abc import Callable, Collection, Iterable, Iterator
 from dataclasses import dataclass
-
-import numpy as np
+from enum import Enum, Flag, auto
+from functools import reduce
+from itertools import chain
+from typing import Optional
+from warnings import warn
 
 
 class Role(Flag):
-    lecturer = auto()
-    practice = auto()
-    both = practice | lecturer
+    LECTURER = auto()
+    PRACTICE = auto()
+    BOTH = PRACTICE | LECTURER
+
+    def __str__(self):
+        return _role_to_str[self]
 
 
-role_to_str = {
-    Role.lecturer: "Лектор",
-    Role.practice: "Практик",
-    Role.both: "Лектор і практик",
+_role_to_str = {
+    Role.LECTURER: "Лектор",
+    Role.PRACTICE: "Практик",
+    Role.BOTH: "Лектор і практик",
+}
+_str_to_role = {v: k for k, v in _role_to_str.items()}
+
+
+class Speciality(Enum):
+    APPLIED_MATH = 0
+    APPLIED_PHYSICS = 1
+    CYBERSECURITY = 2
+
+    def __str__(self):
+        return _op_to_str[self]
+
+
+_op_to_str = {
+    Speciality.APPLIED_MATH: "Прикладна математика",
+    Speciality.APPLIED_PHYSICS: "Прикладна фізика",
+    Speciality.CYBERSECURITY: "Кібербезпека",
 }
 
 
 @dataclass
 class Audience:
-    year: int
-    department: str
-    is_elective: bool
-    num_students: int
+    group: str
+    role: Role
+    is_elective: bool = False
 
-    def __post_init__(self):
-        assert self.num_students > 0
+    @property
+    def speciality(self):
+        letter_to_op = {
+            "ФІ": Speciality.APPLIED_MATH,
+            "ФФ": Speciality.APPLIED_PHYSICS,
+            "ФБ": Speciality.CYBERSECURITY,
+            "ФE": Speciality.CYBERSECURITY,
+        }
+        return letter_to_op[self.group[:1]]
+
+    @property
+    def enrollment_year(self) -> str:
+        return self.group.split("-")[1][0]
+
+    @property
+    def stream(self) -> tuple[Speciality, str]:
+        return (self.speciality, self.enrollment_year)
 
 
 @dataclass
 class Course:
     name: str
     audiences: list[Audience]
-    role: Role
 
     @property
-    def total_num_students(self) -> int:
-        return sum(map(lambda aud: aud.num_students, self.audiences))
+    def specialities(self) -> Collection[Speciality]:
+        return set(aud.speciality for aud in self.audiences)
 
-    def __post_init__(self):
-        assert len(self.name.split()) > 1
+    @property
+    def groups(self) -> Collection[str]:
+        return set(aud.group for aud in self.audiences)
+
+    @property
+    def enrollment_years(self) -> Collection[str]:
+        return set(aud.enrollment_year for aud in self.audiences)
+
+    @property
+    def streams(self) -> Collection[tuple[Speciality, str]]:
+        return set(aud.stream for aud in self.audiences)
+
+    @property
+    def roles(self) -> Collection[Role]:
+        return set(aud.role for aud in self.audiences)
+
+    @property
+    def max_role(self) -> Role:
+        return reduce(operator.or_, [aud.role for aud in self.audiences])
 
 
-def parse_courses(
-    courses_info: dict[str, str | int | bool], year: int, department: str
-) -> dict[str, Course]:
-    courses = {}
-    for course_info in courses_info:
-        name = course_info["name"]
+def nan_or(opt_role: Optional[Role], role: Role) -> Role:
+    if opt_role:
+        return opt_role | role
+    else:
+        return role
 
-        match course_info["role"]:
-            case "Лектор":
-                role = Role.lecturer
-            case "Практик":
-                role = Role.practice
-            case "Лектор і практик":
-                role = Role.both
-            case _:
-                raise AssertionError("Unknown role is provided")
 
-        course = Course(
-            name,
-            [
-                Audience(
-                    year,
-                    department,
-                    course_info["is_elective"],
-                    course_info["num_students"],
-                )
-            ],
-            role,
+@dataclass
+class Teacher:
+    name: str
+    courses: list[Course]
+    student_per_group: dict[str, int]
+
+    @property
+    def num_students(self) -> int:
+        return sum(self.student_per_group.values())
+
+    @property
+    def specialities(self) -> Collection[Speciality]:
+        return set(chain.from_iterable(c.specialities for c in self.courses))
+
+    @property
+    def groups(self) -> Collection[str]:
+        return self.student_per_group.keys()
+
+    @property
+    def enrollment_years(self) -> Collection[str]:
+        return set(chain.from_iterable(c.enrollment_years for c in self.courses))
+
+    @property
+    def streams(self) -> Collection[tuple[Speciality, str]]:
+        return set(chain.from_iterable(c.streams for c in self.courses))
+
+    @property
+    def roles(self) -> Collection[Role]:
+        return set(chain.from_iterable(c.roles for c in self.courses))
+
+    @property
+    def max_role(self) -> Role:
+        return reduce(operator.or_, [c.max_role for c in self.courses])
+
+    def __max_role_for(self, predicate: Callable[[Audience], bool]) -> Optional[Role]:
+        all_audiences = (aud for c in self.courses for aud in c.audiences)
+        return reduce(nan_or, filter(predicate, all_audiences), None)
+
+    def max_role_for_group(self, group: str) -> Optional[Role]:
+        return self.__max_role_for(lambda aud: aud.group == group)
+
+    def max_role_for_spec(self, speciality: Speciality) -> Optional[Role]:
+        return self.__max_role_for(lambda aud: aud.speciality == speciality)
+
+    def max_role_for_enrollment_year(self, year: str) -> Optional[Role]:
+        return self.__max_role_for(lambda aud: aud.enrollment_year == year)
+
+    def max_role_for_stream(self, speciality: Speciality, year: str) -> Optional[Role]:
+        return self.__max_role_for(
+            lambda aud: aud.speciality == speciality and aud.enrollment_year == year
         )
 
-        if name in courses:
-            raise AssertionError("Duplicated course")
-        courses[name] = course
-
-    return courses
-
-
-def parse_teacher_json(path: str):
-    with open(path, "r") as file:
-        data = json.load(file)
-
-    year = data["year"]
-    assert year in range(1, 5)
-
-    department = data["department"]
-
-    teachers = {
-        info["name"]: parse_courses(info["courses"], year, department)
-        for info in data["teachers"]
-    }
-
-    return year, department, teachers
-
-
-def add_to_db(
-    teacher_db: dict[str, dict[str, Course]],
-    new_data: dict[str, dict[str, Course]],
-):
-    for teacher_name, courses in new_data.items():
-        curr_teacher_courses = teacher_db.get(teacher_name, None)
-        if curr_teacher_courses is not None:
-            for course_name, course in courses.items():
-                curr_course = curr_teacher_courses.get(course_name, None)
-                if course_name in curr_teacher_courses:
-                    curr_course.audiences.extend(course.audiences)
-                    curr_course.role |= course.role
-                else:
-                    curr_teacher_courses[course_name] = course
-        else:
-            teacher_db[teacher_name] = courses
-
-
-def load_teacher_db(paths: list[str]):
-    teacher_db = {}
-    for path in paths:
-        year, dep, data = parse_teacher_json(path)
-        add_to_db(teacher_db, data, year, dep)
-
-    return teacher_db
-
-
-def nan_or(arg1, arg2):
-    if arg1 is None:
-        return arg2
-    return arg1 | arg2
-
-
-def get_teacher_with_max_role_for_year(
-    teacher_db: dict[str, dict[str, Course]], year: int
-):
-    results = {}
-    for teacher_name, courses in teacher_db.items():
-        max_role = None
-        for course_name, course in courses.items():
+    def num_students_for_spec(self, speciality: Speciality) -> int:
+        num_students = 0
+        for course in self.courses:
             for aud in course.audiences:
-                if year == aud.year:
-                    max_role = nan_or(max_role, course.role)
-        if max_role is not None:
-            results[teacher_name] = max_role
-    return results
+                if aud.speciality == speciality:
+                    num_students += self.student_per_group[aud.group]
+        return num_students
 
-
-class PreciseEnum(Enum):
-    MANY_ELECTIVES = 0
-    ONE_ELECTIVES = 1
-    PRECISE = 2
-
-
-enum2bool = {
-    PreciseEnum.MANY_ELECTIVES: False,
-    PreciseEnum.ONE_ELECTIVES: True,
-    PreciseEnum.PRECISE: True,
-}
-
-
-def calculate_total_num_students_for_year(
-    teacher_db: dict[str, dict[str, Course]], year: int
-):
-    total_nums = defaultdict(lambda: 0)
-    precise_res = defaultdict(lambda: True)
-    for teacher_name, courses in teacher_db.items():
-        num_by_dep = {}
-        precise_by_dep = {}
-        for course in courses.values():
+    def num_students_for_enrollment_year(self, year: str) -> int:
+        num_students = 0
+        for course in self.courses:
             for aud in course.audiences:
-                if aud.year != year:
-                    continue
+                if aud.enrollment_year == year:
+                    num_students += self.student_per_group[aud.group]
+        return num_students
 
-                dep = aud.department
-                if dep not in num_by_dep:  # no prev info
-                    num_by_dep[dep] = aud.num_students
-                    precise_by_dep[dep] = (
-                        PreciseEnum.PRECISE
-                        if aud.is_elective
-                        else PreciseEnum.ONE_ELECTIVES
+    def num_students_for_stream(self, speciality: Speciality, year: str) -> int:
+        num_students = 0
+        for course in self.courses:
+            for aud in course.audiences:
+                if aud.speciality == speciality and aud.enrollment_year == year:
+                    num_students += self.student_per_group[aud.group]
+        return num_students
+
+    def __post_init__(self):
+        assert len(self.name.split()) == 3
+        assert self.num_students > 0
+
+
+class TeacherDB:
+    def __init__(self):
+        self.db: dict[str, Teacher] = {}
+
+    def append_from_group_dict(self, info: dict) -> None:
+        """
+        The expected structure of the dict:
+        {
+        "group": "ФІ-81",
+        "teachers": [{
+                "name": "Surname Name MiddleName",
+                "courses": [
+                    {
+                        "name": "Дискретна математика 1",
+                        "is_elective": false,
+                        "role": "Лектор"
+                    }
+                ],
+                "num_students": 10
+            }]
+        }
+        """
+        group = info["group"]
+        for teacher_info in info["teachers"]:
+            teacher_name = teacher_info["name"]
+            total_students = teacher_info["num_students"]
+
+            course2audience: dict[str, Audience] = {}
+            for course_info in teacher_info["courses"]:
+                course_name = course_info["name"]
+                course2audience[course_name] = Audience(
+                    group=group,
+                    role=_str_to_role[course_info["role"]],
+                    is_elective=course_info.get("is_elective", False),
+                )
+
+            if teacher_name in self.db:
+                teacher = self.db[teacher_name]
+                teacher.student_per_group[group] = total_students
+
+                if group in teacher.groups:
+                    warn(
+                        f"Info about group {group} for {teacher_name} has already been added before"
                     )
-                elif precise_by_dep == PreciseEnum.PRECISE:  # already known
-                    continue
-                elif not aud.is_elective:
-                    num_by_dep[dep] = aud.num_students
-                    precise_by_dep[dep] = PreciseEnum.PRECISE
-                else:
-                    num_by_dep[dep] = max(aud.num_students, num_by_dep[dep])
-                    precise_by_dep[dep] = PreciseEnum.MANY_ELECTIVES
 
-        if num_by_dep:  # not empty
-            is_precise = np.logical_and.reduce(
-                [enum2bool[it] for it in (precise_by_dep.values())]
-            )
-            total_nums[teacher_name] = sum(num_by_dep.values())
-            precise_res[teacher_name] = is_precise
+                for course in teacher.courses:
+                    if course.name in course2audience:
+                        if group in course.groups:
+                            raise ValueError(
+                                f"Course {course.name} for group {group} has already been added"
+                            )
+                        course.audiences.append(course2audience[course.name])
+                        del course2audience[course.name]
+                for new_course_name, audience in course2audience.items():
+                    teacher.courses.append(
+                        Course(name=new_course_name, audiences=[audience])
+                    )
+            else:
+                courses = [
+                    Course(name=name, audiences=[aud])
+                    for name, aud in course2audience.items()
+                ]
+                self.db[teacher_name] = Teacher(
+                    name=teacher_name,
+                    courses=courses,
+                    student_per_group={group: total_students},
+                )
 
-    return total_nums, precise_res
+    def __getitem__(self, name: str) -> Teacher:
+        return self.db[name]
+
+    def get_all_groups(self) -> Iterable[str]:
+        return set(chain.from_iterable(teacher.groups for teacher in self))
+
+    def __filter_by(self, predicate: Callable[[Audience], bool]) -> Iterable[Teacher]:
+        for teacher in self.db.values():
+            filtered_courses = []
+            groups = set()
+            for course in teacher.courses:
+                auds = list(filter(predicate, course.audiences))
+                if auds:
+                    filtered_courses.append(Course(course.name, audiences=auds))
+                    groups.union(aud.group for aud in auds)
+            if filtered_courses:
+                new_num_stud = {g: teacher.student_per_group[g] for g in groups}
+                yield Teacher(teacher.name, filtered_courses, new_num_stud)
+
+    def filter_by_group(self, group: str) -> Iterable[Teacher]:
+        yield from self.__filter_by(lambda aud: aud.group == group)
+
+    def filter_by_speciality(
+        self, speciality: Speciality
+    ) -> Iterable[tuple[Teacher, Iterable[Role]]]:
+        yield from self.__filter_by(lambda aud: aud.speciality == speciality)
+
+    def filter_by_stream(self, speciality: Speciality, year: str) -> Iterable[Teacher]:
+        yield from self.__filter_by(
+            lambda aud: aud.speciality == speciality and aud.enrollment_year == year
+        )
+
+    def __iter__(self) -> Iterator[Teacher]:
+        return self.db.values()

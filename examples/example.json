@@ -1,6 +1,5 @@
 {
-    "year": 2,
-    "department": "ММАД",
+    "group": "ФІ-81",
     "teachers": [
         {
             "name": "Прізвище Ім'я По-батькові",
@@ -8,16 +7,15 @@
                 {
                     "name": "Повна назва дисципліни",
                     "is_elective": true,
-                    "role": "Практик",
-                    "num_students": 9
+                    "role": "Практик"
                 },
                 {
                     "name": "Повна назва дисципліни 2",
                     "is_elective": true,
-                    "role": "Лектор",
-                    "num_students": 11
+                    "role": "Лектор"
                 }
-            ]
+            ],
+            "num_students": 9
         },
         {
             "name": "Прізвище2 Ім'я2 По-батькові2",
@@ -26,9 +24,9 @@
                     "name": "Повна назва дисципліни 3",
                     "is_elective": false,
                     "role": "Лектор і практик",
-                    "num_students": 23
                 }
-            ]
+            ],
+            "num_students": 23
         }
     ]
 }
