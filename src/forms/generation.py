@@ -43,7 +43,7 @@ def adapt_form_from_template(
     requests = []
     roles = teacher.roles
     if len(roles) == 1:
-        role = teacher.max_role
+        role = teacher.overall_role
         if not insert_loc:
             # find first choice question
             insert_loc = next(
@@ -120,25 +120,22 @@ def generate_form(
         append_question(question, requests)
 
     roles = teacher.roles
-    options_roles: Optional[list[Role]] = None
     if len(roles) == 1:
         append_optional_questions(
-            teacher.max_role, lecturer_questions, practice_questions, requests
+            teacher.overall_role, lecturer_questions, practice_questions, requests
         )
     else:
-        options = [str(role) for role in roles]
-        options_roles = roles
-
         for role in roles:
             append_optional_chapter_for_role(
                 role, lecturer_questions, practice_questions, requests
             )
 
     form_upd_res = update_form_body(requests, forms_service, form_id)
-    if options_roles:
+    if len(roles) > 1:
         section_items = filter(
             lambda item: "pageBreakItem" in item, form_upd_res["form"]["items"]
         )
+        options = [str(role) for role in roles]
         options_to_nextid = {
             option: item["itemId"] for option, item in zip(options, section_items)
         }
@@ -219,7 +216,7 @@ def append_optional_chapter_for_role(
 
 
 def append_question(question: Question, requests: list[dict[str, Any]]) -> None:
-    question_item = {"required": question.required}
+    question_item: dict[str, Any] = {"required": question.required}
     match question.type:
         case QuestionType.RATING_QUESTION:
             question_item["ratingQuestion"] = {
@@ -280,7 +277,7 @@ def update_form_body(
 ) -> dict[str, Any]:
     form_body = {"includeFormInResponse": ret_form, "requests": requests}
     form_upd_res = (
-        forms_service.forms().batchUpdate(formId=form_id, body=form_body).execute()
+        forms_service.forms().batchUpdate(formId=form_id, body=form_body).execute()  # type: ignore
     )
     return form_upd_res
 
@@ -290,7 +287,7 @@ def copy_form(
 ) -> str:
     form_file = {"name": teacher_name, "parents": [dest_folder_id]}
     copy_result = (
-        drive_service.files()
+        drive_service.files()  # type: ignore
         .copy(fileId=template_id, body=form_file, supportsAllDrives=True)
         .execute()
     )

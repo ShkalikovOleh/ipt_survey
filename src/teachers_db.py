@@ -92,8 +92,8 @@ class Course:
         return set(aud.role for aud in self.audiences)
 
     @property
-    def max_role(self) -> Role:
-        return reduce(operator.or_, [aud.role for aud in self.audiences])
+    def overall_role(self) -> Role:
+        return reduce(operator.or_, (aud.role for aud in self.audiences))
 
 
 def nan_or(opt_role: Optional[Role], role: Role) -> Role:
@@ -130,15 +130,19 @@ class Teacher:
         return set(chain.from_iterable(c.streams for c in self.courses))
 
     @property
-    def max_role(self) -> Role:
-        return reduce(operator.or_, [c.max_role for c in self.courses])
+    def overall_role(self) -> Role:
+        return reduce(operator.or_, (c.overall_role for c in self.courses))
 
-    def __max_role_for(self, predicate: Callable[[Audience], bool]) -> Optional[Role]:
+    def __overall_role_for(
+        self, predicate: Callable[[Audience], bool]
+    ) -> Optional[Role]:
         all_audiences = (aud for c in self.courses for aud in c.audiences)
-        return reduce(nan_or, filter(predicate, all_audiences), None)
+        return reduce(
+            nan_or, (aud.role for aud in all_audiences if predicate(aud)), None
+        )
 
-    def max_role_for_group(self, group: str) -> Optional[Role]:
-        return self.__max_role_for(lambda aud: aud.group == group)
+    def overall_role_for_group(self, group: str) -> Optional[Role]:
+        return self.__overall_role_for(lambda aud: aud.group == group)
 
     @property
     def roles(self) -> Collection[Role]:
@@ -162,14 +166,16 @@ class Teacher:
 
         return all_roles
 
-    def max_role_for_spec(self, speciality: Speciality) -> Optional[Role]:
-        return self.__max_role_for(lambda aud: aud.speciality == speciality)
+    def overall_role_for_spec(self, speciality: Speciality) -> Optional[Role]:
+        return self.__overall_role_for(lambda aud: aud.speciality == speciality)
 
-    def max_role_for_enrollment_year(self, year: str) -> Optional[Role]:
-        return self.__max_role_for(lambda aud: aud.enrollment_year == year)
+    def overall_role_for_enrollment_year(self, year: str) -> Optional[Role]:
+        return self.__overall_role_for(lambda aud: aud.enrollment_year == year)
 
-    def max_role_for_stream(self, speciality: Speciality, year: str) -> Optional[Role]:
-        return self.__max_role_for(
+    def overall_role_for_stream(
+        self, speciality: Speciality, year: str
+    ) -> Optional[Role]:
+        return self.__overall_role_for(
             lambda aud: aud.speciality == speciality and aud.enrollment_year == year
         )
 
@@ -291,9 +297,7 @@ class TeacherDB:
     def filter_by_group(self, group: str) -> Iterable[Teacher]:
         yield from self.__filter_by(lambda aud: aud.group == group)
 
-    def filter_by_speciality(
-        self, speciality: Speciality
-    ) -> Iterable[tuple[Teacher, Iterable[Role]]]:
+    def filter_by_speciality(self, speciality: Speciality) -> Iterable[Teacher]:
         yield from self.__filter_by(lambda aud: aud.speciality == speciality)
 
     def filter_by_stream(self, speciality: Speciality, year: str) -> Iterable[Teacher]:

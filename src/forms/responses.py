@@ -1,7 +1,6 @@
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Optional
 
-import numpy as np
 import pandas as pd
 from googleapiclient.discovery import Resource
 
@@ -9,13 +8,15 @@ from src.forms.generation import get_form
 
 
 def get_responses(form_id: str, forms_service: Resource) -> list[dict[str, Any]]:
-    return forms_service.forms().responses().list(formId=form_id).execute()
+    responses = forms_service.forms().responses().list(formId=form_id).execute()  # type: ignore
+    if "responses" in responses:
+        return responses["responses"]
+    else:
+        return []
 
 
 def get_num_responses(form_id: str, forms_service: Resource) -> int:
-    responses = get_responses(form_id, forms_service)
-    num_votes = len(responses["responses"]) if "responses" in responses else 0
-    return num_votes
+    return len(get_responses(form_id, forms_service))
 
 
 def build_id_to_question_map(form_id: str, forms_service: Resource) -> dict[str, str]:
@@ -44,20 +45,19 @@ def gather_responses_to_pandas(
     id2q = build_id_to_question_map(form_id, forms_service)
 
     responses = get_responses(form_id, forms_service)
-    if responses:
-        for response in responses["responses"]:
-            filled_columns = set()
-            for qId, answer_item in response["answers"].items():
-                answer = answer_item["textAnswers"]["answers"][0]["value"]
+    for response in responses:
+        filled_columns = set()
+        for qId, answer_item in response["answers"].items():
+            answer = answer_item["textAnswers"]["answers"][0]["value"]
 
-                question = id2q[qId]
-                filled_columns.add(question)
+            question = id2q[qId]
+            filled_columns.add(question)
 
-                parser = question_parsers.get(question)
-                if parser:
-                    data[question].append(parser(answer))
-            for column in all_columns.difference(filled_columns):
-                data[column].append(np.nan)
+            parser = question_parsers.get(question)
+            if parser:
+                data[question].append(parser(answer))
+        for column in all_columns.difference(filled_columns):
+            data[column].append(pd.NA)
 
     df = pd.DataFrame.from_dict(data)
     return df

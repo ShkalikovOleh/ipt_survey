@@ -34,7 +34,6 @@ def radar_factory(num_vars, frame="circle"):
     theta = np.linspace(0, 2 * np.pi, num_vars, endpoint=False)
 
     class RadarTransform(PolarAxes.PolarTransform):
-
         def transform_path_non_affine(self, path):
             # Paths with non-unit interpolation steps correspond to gridlines,
             # in which case we force interpolation (to defeat PolarTransform's
@@ -44,7 +43,6 @@ def radar_factory(num_vars, frame="circle"):
             return Path(self.transform(path.vertices), path.codes)
 
     class RadarAxes(PolarAxes):
-
         name = "radar"
         PolarTransform = RadarTransform
 
@@ -125,7 +123,7 @@ def get_horizontal_alignment(angle: float) -> str:
 
 def generate_radar_plot(
     grades: np.ndarray,
-    labels: list[float],
+    labels: list[str],
     r_paddings: list[float] | None = None,
     theta_paddings: list[float] | None = None,
     background_color=(19 / 255, 20 / 255, 2 / 255),
@@ -164,7 +162,7 @@ def generate_radar_plot(
     # Adjust radial axes lines
     ax.get_xaxis().set_visible(False)
     num_levels = 5 - start_with_grade_two
-    ax.set_rticks(np.arange(1, num_levels + 1) / num_levels)
+    ax.set_rticks(np.arange(1, num_levels + 1) / num_levels) # type: ignore
 
     # Plot r axis label (with proper occlusion)
     first_r_axis = 1 / num_levels - 0.03
