@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 import re
 
 import pandas as pd
@@ -18,7 +19,9 @@ def num_responses_filter(
     return True
 
 
-def filter_swear_language(answer: str | NAType, swear_words: set[str]) -> str | NAType:
+def filter_swear_language(
+    answer: str | NAType, swear_words: Iterable[str]
+) -> str | NAType:
     if pd.isna(answer):
         return pd.NA
     else:
