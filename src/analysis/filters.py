@@ -29,3 +29,15 @@ def filter_swear_language(answer: str | NAType, swear_words: set[str]) -> str | 
 
         censored_text = re.sub(pattern, replacer, answer, flags=re.IGNORECASE)
         return censored_text
+
+
+def filter_empty_text(
+    answer: str | NAType, empty_text: set[str] = {"-"}
+) -> str | NAType:
+    if pd.isna(answer):
+        return pd.NA
+    elif len(answer) <= 2:
+        return pd.NA
+    elif answer in empty_text:
+        return pd.NA
+    return answer
