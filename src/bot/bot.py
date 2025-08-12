@@ -1,21 +1,19 @@
-from argparse import ArgumentParser, Namespace
-from collections.abc import Generator, Iterable, Mapping
+import datetime
 import json
 import os
-import random
+import time
+from argparse import ArgumentParser, Namespace
+from collections.abc import Generator, Iterable, Mapping
 from typing import TypeVar
+
+import dateutil
 import dateutil.parser
 import pandas as pd
 import pytz
 from telegram import Update
-from telegram.ext import ContextTypes, Application, MessageHandler, filters
-import datetime
-import dateutil
-import time
+from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
-
-from src.teachers_db import Course, add_to_db, parse_teacher_json, role_to_str
-
+from src.teachers_db import TeacherDB
 
 T = TypeVar("T")
 
@@ -31,177 +29,185 @@ def batched(iterable: Iterable[T], n) -> Generator[T]:
         yield current_batch
 
 
-N_BATCH = 4
-col2desc = {
-    "Які позитивні риси є у викладача (такі, що можна порекомендувати іншим викладачам)?": "Які позитивні риси є у викладача?",
-    "Поради для студентів. Що краще робити (чи навпаки, не робити) для побудови гарних відносин із викладачем, які характерні особливості є у викладача, про які ви вважаєте варто знати тим, хто буде у нього вчитись?": "Поради для студентів.",
-    "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт": "Відкритий мікрофон.",
-}
-col2emoji = {
-    "Які позитивні риси є у викладача (такі, що можна порекомендувати іншим викладачам)?": "💚",
-    "Поради для студентів. Що краще робити (чи навпаки, не робити) для побудови гарних відносин із викладачем, які характерні особливості є у викладача, про які ви вважаєте варто знати тим, хто буде у нього вчитись?": "🤝",
-    "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт": "📢",
-}
-foul2stars = {
-    "хуя": "х**",
-    "підор": "п****",
-    "нахуй": "н****",
-    " бля": " б**",
-    "сука": "с***",
-}
+class PersistentState:
+    def __init__(
+        self,
+        min_working_hour: int,
+        max_working_hour: int,
+    ) -> None:
+        self.curr_pos_file = "pers_state.json"
+        self.min_working_hour = min_working_hour
+        self.max_working_hour = max_working_hour
 
+    @property
+    def publication_allowed(self) -> bool:
+        tmzinfo = pytz.timezone("Europe/Kyiv")
+        curr_hour = datetime.datetime.now(tmzinfo).hour
+        return curr_hour < self.min_working_hour or curr_hour >= self.max_working_hour
 
-def filter_foul_language(comment: str):
-    for foul, star in foul2stars.items():
-        comment = comment.replace(foul, star)
-    return comment
+    @property
+    def idx(self) -> int:
+        if os.path.exists(self.curr_pos_file):
+            with open(self.curr_pos_file, "r") as pers_state_file:
+                return json.load(pers_state_file)["curr_pos"]
+        else:
+            return 0
+
+    @idx.setter
+    def idx(self, value: int) -> None:
+        with open(self.curr_pos_file, "w") as pers_state_file:
+            json.dump({"curr_pos": value}, pers_state_file)
 
 
 async def post_next_teacher_results(
     context: ContextTypes.DEFAULT_TYPE,
     channel_id: str,
     viz_folder: str,
-    teachers_db: dict[str, dict[str, Course]],
-    df: pd.DataFrame,
-    min_working_hour: int,
-    max_working_hour: int,
+    teachers_db: TeacherDB,
+    order_of_publication: list[str],
+    persistent_state: PersistentState,
 ):
-    tmzinfo = pytz.timezone("Europe/Kyiv")
-    curr_hour = datetime.datetime.now(tmzinfo).hour
-    if curr_hour < min_working_hour or curr_hour >= max_working_hour:
+    curr_pos = persistent_state.idx
+    if not persistent_state.publication_allowed or curr_pos > len(order_of_publication):
         return
 
-    shuffled_keys = df.index.to_list()
-    random.Random(42).shuffle(shuffled_keys)
+    teacher_name = order_of_publication[curr_pos]
+    teacher = teachers_db[teacher_name]
 
-    if os.path.exists("pers_state.json"):
-        with open("pers_state.json", "r") as pers_state_file:
-            curr_pos = json.load(pers_state_file)["curr_pos"]
-    else:
-        curr_pos = 0
-
-    if curr_pos > len(shuffled_keys):
-        return
-
-    teacher_name = shuffled_keys[curr_pos]
-
-    caption = f"{teacher_name}\n"
+    caption = f"{teacher.name}\n"
     marks = "🔹🔸"
-    for idx, (course_name, course) in enumerate(teachers_db[teacher_name].items()):
+    for idx, course in enumerate(teacher.courses):
         mark = marks[idx % 2]
-        caption += f"\n{mark} {course_name} - {role_to_str[course.role]}"
+        caption += f"\n{mark} {course.name} - {course.overall_role}"
 
     await context.bot.send_photo(
         chat_id=channel_id,
-        photo=f"{viz_folder}/{teacher_name}.png",
+        photo=f"{viz_folder}/{teacher.name}.png",
         caption=caption,
         parse_mode="html",
     )
 
-    with open("pers_state.json", "w") as pers_state_file:
-        json.dump({"curr_pos": curr_pos + 1}, pers_state_file)
+    persistent_state.idx = curr_pos + 1
 
 
 async def add_comments(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, df_results: pd.DataFrame
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    df_results: pd.DataFrame,
+    n_batch: int,
+    col2desc: dict[str, list[str] | str],
+    col2emoji: dict[str, list[str] | str],
 ):
     name = update.message.caption.splitlines()[0]
     if name in df_results.index:
         data = df_results.loc[name]
-
-        columns = [
-            "Які позитивні риси є у викладача (такі, що можна порекомендувати іншим викладачам)?",
-            "Поради для студентів. Що краще робити (чи навпаки, не робити) для побудови гарних відносин із викладачем, які характерні особливості є у викладача, про які ви вважаєте варто знати тим, хто буде у нього вчитись?",
-            "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт",
-        ]
-
-        for col in columns[:1]:
-            await post_comment(update, context, data, col)
-
-        for answers in batched(data["drawbacks_merged"], N_BATCH):
-            comment = (
-                "<blockquote>Які недоліки є у викладанні?</blockquote>\n"
-                "<blockquote>Які шляхи їх вирішення ви бачите?</blockquote>\n"
-            )
-            for answer in answers:
-                critic, sugg = answer
-
-                comment += "\n"
-                if isinstance(critic, str):
-                    comment += f"🔴 {filter_foul_language(critic.rstrip())}\n"
-                if isinstance(sugg, str):
-                    comment += f"➡️ {filter_foul_language(sugg.rstrip())}\n"
-
-            time.sleep(4)
-            await context.bot.send_message(
-                chat_id=update.message.chat_id,
-                text=comment,
-                reply_to_message_id=update.message.id,
-                parse_mode="html",
-            )
-
-        for col in columns[1:]:
-            await post_comment(update, context, data, col)
+        for col, desc in col2desc.items():
+            if isinstance(desc, str):
+                await add_comments_batch(
+                    update, context, data, col, n_batch, col2desc, col2emoji
+                )
+            else:
+                await add_paired_comments_batch(
+                    update, context, data, col, n_batch, col2desc, col2emoji
+                )
 
 
-async def post_comment(
+async def add_paired_comments_batch(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     data: Mapping[str, str],
-    col: str,
+    column: str,
+    n_batch: int,
+    col2desc: dict[str, list[str] | str],
+    col2emoji: dict[str, list[str] | str],
 ):
-    for answers in batched(data[col], N_BATCH):
-        comment = f"<blockquote>{col2desc[col]}</blockquote>"
-        for answer in answers:
-            comment += f"\n\n{col2emoji[col]} {filter_foul_language(answer.rstrip())}"
-
-        await context.bot.send_message(
-            chat_id=update.message.chat_id,
-            text=comment,
-            reply_to_message_id=update.message.id,
-            parse_mode="html",
+    for answers in batched(data[column], n_batch):
+        comment = (
+            f"<blockquote>{col2desc[column][0]}</blockquote>\n"
+            f"<blockquote>{col2desc[column][1]}</blockquote>\n"
         )
-        time.sleep(4)  # No more than 20 message per minute
+        for answer in answers:
+            ans0, ans1 = answer
+
+            comment += "\n"
+            if isinstance(ans0, str):
+                comment += f"{col2emoji[column][0]} {ans0}\n"
+            if isinstance(ans1, str):
+                comment += f"{col2emoji[column][1]} {ans1}\n"
+
+        await post_comment(update, context, comment)
+
+
+async def add_comments_batch(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    data: Mapping[str, str],
+    column: str,
+    n_batch: int,
+    col2desc: dict[str, list[str] | str],
+    col2emoji: dict[str, list[str] | str],
+):
+    for answers in batched(data[column], n_batch):
+        comment = f"<blockquote>{col2desc[column]}</blockquote>"
+        for answer in answers:
+            comment += f"\n\n{col2emoji[column]} {answer}"
+        await post_comment(update, context, comment)
+
+
+async def post_comment(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, comment: str
+):
+    await context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=comment,
+        reply_to_message_id=update.message.id,
+        parse_mode="html",
+    )
+    time.sleep(4)  # No more than 20 message per minute
 
 
 def run_bot(
     token: str,
     channel_id: str,
-    teachers_db: dict[str, dict[str, Course]],
+    teachers_db: TeacherDB,
     df: pd.DataFrame,
     viz_folder: str,
     start_time: datetime.datetime,
     interval_min: int,
-    min_working_hour: int,
-    max_working_hour: int,
+    order_of_publication: list[str],
+    n_batch: int,
+    col2desc: dict[str, list[str] | str],
+    col2emoji: dict[str, list[str] | str],
+    persistent_state: PersistentState,
 ):
     application = (
         Application.builder().read_timeout(120).write_timeout(120).token(token).build()
     )
-    job_queue = application.job_queue
 
+    # Schedule posting every interval_min
     async def post_func(context):
         return await post_next_teacher_results(
             context,
             channel_id=channel_id,
             viz_folder=viz_folder,
             teachers_db=teachers_db,
-            df=df,
-            min_working_hour=min_working_hour,
-            max_working_hour=max_working_hour,
+            order_of_publication=order_of_publication,
+            persistent_state=persistent_state,
         )
 
+    job_queue = application.job_queue
+    schedule_posting(start_time, interval_min, job_queue, post_func)
+
+    # Add comments to new posts
     async def comment_func(update, context):
-        return await add_comments(update, context, df)
-
-    timezone = start_time.tzinfo
-    now = datetime.datetime.now(timezone)
-    if now > start_time:
-        first = 5
-    else:
-        first = int((start_time - now).total_seconds())
-
-    job_queue.run_repeating(post_func, interval=interval_min * 60, first=first)
+        return await add_comments(
+            update,
+            context,
+            df_results=df,
+            n_batch=n_batch,
+            col2desc=col2desc,
+            col2emoji=col2emoji,
+        )
 
     channel_post_handler = MessageHandler(
         filters.User(777000) & filters.Caption(),  # TG_ID
@@ -209,14 +215,26 @@ def run_bot(
     )
     application.add_handler(channel_post_handler)
 
+    # Start listening
     application.run_polling()
 
 
-def load_teachers_db(files: list[str]):
-    teacher_db = {}
+def schedule_posting(start_time, interval_min: int, job_queue, post_func):
+    timezone = start_time.tzinfo
+    now = datetime.datetime.now(timezone)
+    if now > start_time:
+        first = 5
+    else:
+        first = int((start_time - now).total_seconds())
+    job_queue.run_repeating(post_func, interval=interval_min * 60, first=first)
+
+
+def load_teachers_db(files: list[str]) -> TeacherDB:
+    teacher_db = TeacherDB()
     for path in files:
-        _, _, data = parse_teacher_json(path)
-        add_to_db(teacher_db, data)
+        with open(path) as file:
+            info = json.loads(file)
+            teacher_db.append_from_group_dict(info)
 
     return teacher_db
 
@@ -225,21 +243,24 @@ def main(args: Namespace):
     with open(args.cfg_file) as cfg_file:
         cfg = json.load(cfg_file)
 
-    start_time = dateutil.parser.parse(cfg["start_time"])
-
     df = pd.read_feather(cfg["survey_results"])
     teachers_db = load_teachers_db(cfg["teachers_info_files"])
 
     run_bot(
-        cfg["TG_TOKEN"],
-        cfg["channel_id"],
-        teachers_db,
-        df,
-        cfg["viz_folder"],
-        start_time,
-        cfg["interval_min"],
-        cfg["working_hours"]["min"],
-        cfg["working_hours"]["max"],
+        token=cfg["TG_TOKEN"],
+        channel_id=cfg["channel_id"],
+        teachers_db=teachers_db,
+        df=df,
+        viz_folder=cfg["viz_folder"],
+        start_time=dateutil.parser.parse(cfg["start_time"]),
+        interval_min=cfg["interval_min"],
+        order_of_publication=cfg.get("order_of_publication", df.index.to_list()),
+        n_batch=cfg["n_batch"],
+        col2desc=cfg["col2desc"],
+        col2emoji=cfg["col2emoji"],
+        persistent_state=PersistentState(
+            cfg["working_hours"]["min"], cfg["working_hours"]["max"]
+        ),
     )
 
 
