@@ -7,6 +7,13 @@ from googleapiclient.discovery import Resource
 from src.teachers_db import Role, Teacher
 
 
+class Granularity(str, Enum):
+    GROUP = "group"
+    STREAM = "stream"
+    SPECIALITY = "speciality"
+    FACULTY = "faculty"
+
+
 class QuestionType(Enum):
     RATING_QUESTION = 0
     OPEN_QUESTION = 1
@@ -39,8 +46,18 @@ def adapt_form_from_template(
     ]  # [(loc, id)]
     assert len(section_itemids) == 3, "Expected 3 section for optional questions"
 
+    requests = [
+        {
+            "updateFormInfo": {
+                "info": {
+                    "title": teacher.name,
+                },
+                "updateMask": "title",
+            }
+        }
+    ]
+
     section_roles = [Role.PRACTICE, Role.LECTURER, Role.BOTH]
-    requests = []
     roles = teacher.roles
     if len(roles) == 1:
         role = teacher.overall_role

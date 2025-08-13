@@ -13,7 +13,7 @@ import pytz
 from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
-from src.teachers_db import TeacherDB
+from src.teachers_db import TeacherDB, load_teachers_db
 
 T = TypeVar("T")
 
@@ -227,16 +227,6 @@ def schedule_posting(start_time, interval_min: int, job_queue, post_func):
     else:
         first = int((start_time - now).total_seconds())
     job_queue.run_repeating(post_func, interval=interval_min * 60, first=first)
-
-
-def load_teachers_db(files: list[str]) -> TeacherDB:
-    teacher_db = TeacherDB()
-    for path in files:
-        with open(path) as file:
-            info = json.loads(file)
-            teacher_db.append_from_group_dict(info)
-
-    return teacher_db
 
 
 def main(args: Namespace):

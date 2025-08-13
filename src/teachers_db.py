@@ -1,3 +1,4 @@
+import json
 import operator
 from collections.abc import Callable, Collection, Iterable, Iterator
 from dataclasses import dataclass
@@ -25,10 +26,10 @@ _role_to_str = {
 _str_to_role = {v: k for k, v in _role_to_str.items()}
 
 
-class Speciality(Enum):
-    APPLIED_MATH = 0
-    APPLIED_PHYSICS = 1
-    CYBERSECURITY = 2
+class Speciality(str, Enum):
+    APPLIED_MATH = "F1"
+    APPLIED_PHYSICS = "E6"
+    CYBERSECURITY = "F5"
 
     def __str__(self):
         return _op_to_str[self]
@@ -281,6 +282,12 @@ class TeacherDB:
     def get_all_groups(self) -> Iterable[str]:
         return set(chain.from_iterable(teacher.groups for teacher in self))
 
+    def get_all_specialities(self) -> Iterable[Speciality]:
+        return set(chain.from_iterable(teacher.specialities for teacher in self))
+
+    def get_all_streams(self) -> Iterable[tuple[Speciality, str]]:
+        return set(chain.from_iterable(teacher.streams for teacher in self))
+
     def __filter_by(self, predicate: Callable[[Audience], bool]) -> Iterable[Teacher]:
         for teacher in self.db.values():
             filtered_courses = []
@@ -307,3 +314,13 @@ class TeacherDB:
 
     def __iter__(self) -> Iterator[Teacher]:
         return iter(self.db.values())
+
+
+def load_teachers_db(json_files: list[str]) -> TeacherDB:
+    teacher_db = TeacherDB()
+    for path in json_files:
+        with open(path) as file:
+            info = json.load(file)
+            teacher_db.append_from_group_dict(info)
+
+    return teacher_db

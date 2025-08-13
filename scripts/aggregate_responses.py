@@ -1,5 +1,6 @@
 import argparse
 from functools import partial
+
 import pandas as pd
 
 from src.analysis.aggregators import (
@@ -38,11 +39,32 @@ def main(raw_df_path: str, out_path: str):
         "Поради для студентів. Що краще робити (чи навпаки, не робити) для побудови гарних відносин із викладачем, які характерні особливості є у викладача, про які ви вважаєте варто знати тим, хто буде у нього вчитись?": concat_text_answers,
         "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт": concat_text_answers,
     }
-    swear_words = set("a", "b")
+    swear_words = set(
+        "бля",
+        "блядь",
+        "блять",
+        "сука",
+        "пізда",
+        "піздець",
+        "хуй",
+        "нахуй",
+        "нахуя",
+        "жопа",
+        "курва",
+        "мудак",
+        "дебіл",
+        "шлюха",
+        "говно",
+        "лайно",
+        "підор",
+        "підар",
+    )
     filter_swear_language_func = partial(filter_swear_language, swear_words=swear_words)
 
-    df[text_columns] = df[text_columns].map(filter_empty_text)
-    df[text_columns] = df[text_columns].map(filter_swear_language_func)
+    df[text_columns] = df[text_columns].map(filter_empty_text, na_action="ignore")
+    df[text_columns] = df[text_columns].map(
+        filter_swear_language_func, na_action="ignore"
+    )
 
     df["drawbacks_merged"] = df.apply(
         lambda row: merge_two_text_columns(

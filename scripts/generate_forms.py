@@ -1,0 +1,171 @@
+import argparse
+import json
+
+from enum_helper import EnumAction
+from tqdm import tqdm
+
+from src.forms.generation import Granularity, adapt_form_from_template
+from src.forms.publishing import give_access_to_organization, publish_form
+from src.forms.services import (
+    get_drive_service,
+    get_forms_service,
+    get_gapi_credentials,
+)
+from src.teachers_db import Speciality, TeacherDB, load_teachers_db
+
+
+def prepare_funcs(db: TeacherDB, granularity: Granularity):
+    match granularity:
+        case Granularity.GROUP:
+
+            def options_func():
+                return db.get_all_groups()
+
+            def metadata_func(group: str):
+                return {"group": group}
+
+            def filter_func(group: str):
+                return db.filter_by_group(group)
+        case Granularity.STREAM:
+
+            def options_func():
+                return db.get_all_streams()
+
+            def metadata_func(stream: tuple[Speciality, str]):
+                return {"speciality": str(stream[0]), "year": stream[1]}
+
+            def filter_func(stream: tuple[Speciality, str]):
+                return db.filter_by_stream(speciality=stream[0], year=stream[1])
+        case Granularity.SPECIALITY:
+
+            def options_func():
+                return db.get_all_specialities()
+
+            def metadata_func(spec: Speciality):
+                return {"speciality": str(spec)}
+
+            def filter_func(spec: Speciality):
+                return db.filter_by_speciality(spec)
+        case Granularity.FACULTY:
+
+            def options_func():
+                return ["ФТІ"]
+
+            def metadata_func(faculty: str) -> dict:
+                return {"faculty": faculty}
+
+            def filter_func(faculty: str):
+                return db
+
+    return options_func, filter_func, metadata_func
+
+
+def generate_forms(
+    teacher_jsons: list[str],
+    template_id: str,
+    dest_folder_id: str,
+    granularity: Granularity,
+    secrets_file: str,
+    token_file: str,
+    out_path: str,
+):
+    db = load_teachers_db(teacher_jsons)
+
+    ops_func, filter_func, meta_func = prepare_funcs(db, granularity)
+
+    creds = get_gapi_credentials(cred_file=secrets_file, token_store_file=token_file)
+    forms_service = get_forms_service(creds)
+    drive_serive = get_drive_service(creds)
+
+    forms_dict: dict[str, list[dict[str, str]]] = {}
+    options = list(ops_func())
+    for option in tqdm(options):
+        for teacher in tqdm(filter_func(option)):
+            form_id, resp_url = adapt_form_from_template(
+                teacher=teacher,
+                forms_service=forms_service,
+                drive_service=drive_serive,
+                template_id=template_id,
+                dest_folder_id=dest_folder_id,
+            )
+            publish_form(form_id=form_id, forms_service=forms_service)
+            give_access_to_organization(form_id=form_id, drive_service=drive_serive)
+
+            form_info = meta_func(option)
+            form_info["form_id"] = form_id
+            form_info["resp_url"] = resp_url
+            if teacher.name in forms_dict:
+                forms_dict[teacher.name].append(form_info)
+            else:
+                forms_dict[teacher.name] = [form_info]
+
+    with open(out_path, "w") as file:
+        json.dump(
+            {
+                "granularity": granularity,
+                "forms": forms_dict,
+            },
+            file,
+            ensure_ascii=False,
+        )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--teacher_data",
+        nargs="+",
+        type=str,
+        required=True,
+        help="Paths to json files with teacher info",
+    )
+    parser.add_argument(
+        "--template_id",
+        type=str,
+        required=True,
+        help="Id of the universal template (take from url of the form)",
+    )
+    parser.add_argument(
+        "--dest_folder_id",
+        type=str,
+        required=True,
+        help="Id of the drive folder where to place generated forms",
+    )
+    parser.add_argument(
+        "--secrets_file",
+        type=str,
+        required=True,
+        help="Path to the Google API secrets",
+    )
+    parser.add_argument(
+        "--token_file",
+        type=str,
+        required=True,
+        help="Where to save/reuse access token",
+    )
+    parser.add_argument(
+        "--granularity",
+        type=Granularity,
+        action=EnumAction,
+        default=Granularity.FACULTY,
+        help="Specify the granularity level of forms",
+    )
+    parser.add_argument(
+        "--out_path",
+        type=str,
+        required=True,
+        help="Path to generated json file with links to forms",
+    )
+
+    args = parser.parse_args()
+
+    generate_forms(
+        teacher_jsons=args.teacher_data,
+        template_id=args.template_id,
+        dest_folder_id=args.dest_folder_id,
+        granularity=args.granularity,
+        secrets_file=args.secrets_file,
+        token_file=args.token_file,
+        out_path=args.out_path,
+    )
