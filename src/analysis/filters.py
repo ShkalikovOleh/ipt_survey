@@ -1,5 +1,5 @@
-from collections.abc import Iterable
 import re
+from collections.abc import Iterable
 
 import pandas as pd
 from pandas.api.typing import NAType
@@ -25,7 +25,7 @@ def filter_swear_language(
     if pd.isna(answer):
         return pd.NA
     else:
-        pattern = r"\b(" + "|".join(re.escape(word) for word in swear_words) + r")\b"
+        pattern = r"\b(" + "|".join(re.escape(word) for word in swear_words) + r")"
 
         def replacer(match: re.Match):
             return "*" * len(match.group(0))

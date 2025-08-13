@@ -1,7 +1,9 @@
 from textwrap import wrap
-from PIL import Image
-from PIL import ImageDraw
+
+from PIL import Image, ImageDraw
 from PIL.ImageFont import FreeTypeFont
+
+from src.teachers_db import Role
 
 
 def get_continue_teaching_color(percent: int) -> tuple[int, int, int]:
@@ -14,7 +16,7 @@ def get_continue_teaching_color(percent: int) -> tuple[int, int, int]:
 
 def generate_survey_result_picture(
     name: str,
-    position: str,
+    role: Role,
     per_continue_teaching: int,
     num_response: int,
     max_num_response: int,
@@ -54,7 +56,7 @@ def generate_survey_result_picture(
 
     position_pos = last_line_ypos + 60
     draw.text(
-        (margin, position_pos), position, color_map["text"], font=fonts_map["text"]
+        (margin, position_pos), str(role), color_map["text"], font=fonts_map["text"]
     )
 
     perc_pos = height - 550 - margin

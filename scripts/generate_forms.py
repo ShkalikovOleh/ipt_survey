@@ -1,7 +1,7 @@
 import argparse
 import json
 
-from enum_helper import EnumAction
+from cli_helpers import EnumAction
 from tqdm import tqdm
 
 from src.forms.generation import Granularity, adapt_form_from_template
@@ -32,7 +32,7 @@ def prepare_funcs(db: TeacherDB, granularity: Granularity):
                 return db.get_all_streams()
 
             def metadata_func(stream: tuple[Speciality, str]):
-                return {"speciality": str(stream[0]), "year": stream[1]}
+                return {"speciality": stream[0], "year": stream[1]}
 
             def filter_func(stream: tuple[Speciality, str]):
                 return db.filter_by_stream(speciality=stream[0], year=stream[1])
@@ -42,7 +42,7 @@ def prepare_funcs(db: TeacherDB, granularity: Granularity):
                 return db.get_all_specialities()
 
             def metadata_func(spec: Speciality):
-                return {"speciality": str(spec)}
+                return {"speciality": spec}
 
             def filter_func(spec: Speciality):
                 return db.filter_by_speciality(spec)
