@@ -133,20 +133,71 @@ async def get_group_stats(
     forms_granularity: Granularity,
     forms_service: Resource,
 ):
-    group = context.args[0]
+    query = context.args[0]
+    granularity = Granularity.GROUP
     filter_func = get_filter_func(
         form_granularity=forms_granularity,
-        requested_granularity=Granularity.GROUP,
-        query=group,
+        requested_granularity=granularity,
+        query=query,
         db=teachers_db,
     )
+    await send_stats_for_granularity(
+        update,
+        context,
+        forms_dict,
+        teachers_db,
+        forms_service,
+        query,
+        granularity,
+        filter_func,
+    )
+
+
+async def get_speciality_stats(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    forms_dict: dict[str, list[str, str]],
+    teachers_db: TeacherDB,
+    forms_granularity: Granularity,
+    forms_service: Resource,
+):
+    query = context.args[0]
+    granularity = Granularity.SPECIALITY
+    filter_func = get_filter_func(
+        form_granularity=forms_granularity,
+        requested_granularity=granularity,
+        query=query,
+        db=teachers_db,
+    )
+    await send_stats_for_granularity(
+        update,
+        context,
+        forms_dict,
+        teachers_db,
+        forms_service,
+        query,
+        granularity,
+        filter_func,
+    )
+
+
+async def send_stats_for_granularity(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    forms_dict: dict[str, list[str, str]],
+    teachers_db: TeacherDB,
+    forms_service: Resource,
+    query: str | Speciality | Stream,
+    granularity: Granularity,
+    filter_func: Callable,
+):
     messages = []
     for teacher_name, forms in forms_dict.items():
         num_responses = 0
         do_append = False
 
         max_num_responses = get_max_student_for_granularity(
-            Granularity.GROUP, group, teachers_db, teacher_name
+            granularity, query, teachers_db, teacher_name
         )
         for form in forms:
             if filter_func(teacher_name, form):
@@ -164,7 +215,7 @@ async def get_group_stats(
     if messages:
         await send_message(update, context, "\n".join(messages))
     else:
-        await send_message(update, context, "No links for this query")
+        await send_message(update, context, "No forms for this query")
 
 
 async def send_links(
@@ -309,6 +360,16 @@ def run_bot(
         create_stats_command(
             "sgroup",
             get_group_stats,
+            teachers_db=teachers_db,
+            forms_dict=forms_dict,
+            forms_granularity=forms_granularity,
+            forms_service=forms_service,
+        )
+    )
+    application.add_handler(
+        create_stats_command(
+            "sspec",
+            get_speciality_stats,
             teachers_db=teachers_db,
             forms_dict=forms_dict,
             forms_granularity=forms_granularity,
