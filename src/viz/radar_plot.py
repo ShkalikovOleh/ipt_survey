@@ -162,7 +162,7 @@ def generate_radar_plot(
     # Adjust radial axes lines
     ax.get_xaxis().set_visible(False)
     num_levels = 5 - start_with_grade_two
-    ax.set_rticks(np.arange(1, num_levels + 1) / num_levels) # type: ignore
+    ax.set_rticks(np.arange(1, num_levels + 1) / num_levels)  # type: ignore
 
     # Plot r axis label (with proper occlusion)
     first_r_axis = 1 / num_levels - 0.03

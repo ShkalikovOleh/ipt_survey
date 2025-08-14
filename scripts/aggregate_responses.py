@@ -79,7 +79,7 @@ def main(raw_df_path: str, out_path: str):
     )
 
     grouped_df = df.groupby(by="name", dropna=False)
-    counts_per_teacher = grouped_df.size().to_frame("num_respondents")
+    counts_per_teacher = grouped_df.size().to_frame("num_responses")
     agg_df = grouped_df.agg(columns_to_agg).join(counts_per_teacher)
 
     agg_df.to_parquet(out_path)
