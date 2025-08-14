@@ -4,29 +4,9 @@ from functools import partial
 from typing import Optional
 
 from cli_helpers import EnumAction, ParseStreamAction
-from tqdm import tqdm
 
-from src.forms.filtering import Granularity, get_filter_func
-from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
-
-
-def fitler_urls(
-    forms_granularity: Granularity,
-    requested_granularity: Granularity,
-    query: Optional[str | Speciality | Stream],
-    forms_dict: dict[str, list[dict[str, str]]],
-    db: TeacherDB,
-):
-    filter_func = get_filter_func(
-        form_granularity=forms_granularity,
-        requested_granularity=requested_granularity,
-        query=query,
-        db=db,
-    )
-    for teacher_name, forms in tqdm(forms_dict.items()):
-        for form in forms:
-            if filter_func(teacher_name, form):
-                yield (teacher_name, form["resp_url"])
+from src.forms.filtering import Granularity, fitler_urls
+from src.teachers_db import Speciality, Stream, load_teachers_db
 
 
 def print_urls(
