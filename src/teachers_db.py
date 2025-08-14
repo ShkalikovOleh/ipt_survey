@@ -1,6 +1,6 @@
 import json
 import operator
-from collections.abc import Callable, Collection, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum, Flag, auto
 from functools import reduce

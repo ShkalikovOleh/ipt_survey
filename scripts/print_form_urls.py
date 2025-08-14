@@ -49,7 +49,7 @@ if __name__ == "__main__":
         "--forms_json",
         type=str,
         required=True,
-        help="Paths to json files with forms info",
+        help="Paths to json file with forms info",
     )
     parser.add_argument(
         "--format", type=str, choices=["markdown", "simple"], default="markdown"
