@@ -55,8 +55,13 @@ def print_stats(
             do_print = True
             max_num_responses = db[teacher_name].num_students
             for form in forms:
-                num_responses += get_num_responses(
+                form_responses = get_num_responses(
                     form["form_id"], forms_service=forms_service
+                )
+                num_responses += form_responses
+
+                print_per_form_stats(
+                    forms_granularity, db, teacher_name, form, form_responses
                 )
 
         if do_print:
@@ -64,6 +69,52 @@ def print_stats(
                 teacher_name,
                 f"{num_responses}/{max_num_responses}",
                 num_responses / max_num_responses,
+            )
+
+
+def print_per_form_stats(
+    forms_granularity: Granularity,
+    db: TeacherDB,
+    teacher_name: str,
+    form: dict[str, str],
+    form_responses: int,
+):
+    match forms_granularity:
+        case Granularity.GROUP:
+            max_form_resp = get_max_student_for_granularity(
+                forms_granularity, form["group"], db, teacher_name
+            )
+            print(
+                teacher_name,
+                form["group"],
+                f"{form_responses}/{max_form_resp}",
+                form_responses / max_form_resp,
+            )
+        case Granularity.STREAM:
+            max_form_resp = get_max_student_for_granularity(
+                forms_granularity,
+                Stream(Speciality(form["speciality"]), form["year"]),
+                db,
+                teacher_name,
+            )
+            print(
+                teacher_name,
+                f"{form['speciality']}-{form['year']}",
+                f"{form_responses}/{max_form_resp}",
+                form_responses / max_form_resp,
+            )
+        case Granularity.SPECIALITY:
+            max_form_resp = get_max_student_for_granularity(
+                forms_granularity,
+                Speciality(form["speciality"]),
+                db,
+                teacher_name,
+            )
+            print(
+                teacher_name,
+                form["speciality"],
+                f"{form_responses}/{max_form_resp}",
+                form_responses / max_form_resp,
             )
 
 
