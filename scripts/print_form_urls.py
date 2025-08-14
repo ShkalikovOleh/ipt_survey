@@ -3,61 +3,32 @@ import json
 from typing import Optional
 
 from cli_helpers import EnumAction, ParseStreamAction
-from tqdm import tqdm
 
-from src.forms.generation import Granularity
-from src.teachers_db import Speciality
-
-
-def get_filter_func(
-    granularity: Granularity, query: Optional[str | Speciality | tuple[Speciality, str]]
-):
-    match granularity:
-        case Granularity.GROUP:
-
-            def filter_func(form_info):
-                return form_info["group"] == query
-        case Granularity.STREAM:
-
-            def filter_func(form_info):
-                return (
-                    form_info["speciality"] == query[0]
-                    and form_info["year"] == query[1]
-                )
-        case Granularity.SPECIALITY:
-
-            def filter_func(form_info):
-                return form_info["speciality"] == query
-        case Granularity.FACULTY:
-
-            def filter_func(form_info):
-                return True
-
-    return filter_func
-
-
-def fitler_urls(
-    forms_json: str,
-    granularity: Granularity,
-    query: Optional[str | Speciality | tuple[Speciality, str]],
-):
-    with open(forms_json, "r", encoding="utf-8") as file:
-        forms_dict: dict[str, list[dict[str, str]]] = json.load(file)["forms"]
-
-    filter_func = get_filter_func(granularity, query)
-    for teacher_name, forms in tqdm(forms_dict.items()):
-        for form in forms:
-            if filter_func(form):
-                yield (teacher_name, form["resp_url"])
+from src.forms.filtering import Granularity, fitler_urls
+from src.teachers_db import Speciality, Stream, load_teachers_db
 
 
 def print_urls(
+    db_jsons: list[str],
     forms_json: str,
     format: str,
     granularity: Granularity,
-    query: Optional[str | Speciality | tuple[Speciality, str]],
+    query: Optional[str | Speciality | Stream],
 ):
-    for name, url in fitler_urls(forms_json, granularity, query):
+    with open(forms_json, "r", encoding="utf-8") as file:
+        forms_info = json.load(file)
+        forms_granularity = forms_info["granularity"]
+        forms_dict: dict[str, list[dict[str, str]]] = forms_info["forms"]
+
+    db = load_teachers_db(db_jsons)
+
+    for name, url in fitler_urls(
+        forms_granularity=forms_granularity,
+        requested_granularity=granularity,
+        query=query,
+        forms_dict=forms_dict,
+        db=db,
+    ):
         if format == "markdown":
             print(f"[{name}]({url})")
         elif format == "simple":
@@ -67,6 +38,13 @@ def print_urls(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    parser.add_argument(
+        "--teacher_data",
+        nargs="+",
+        type=str,
+        required=True,
+        help="Paths to json files with teacher info",
+    )
     parser.add_argument(
         "--forms_json",
         type=str,
@@ -94,6 +72,7 @@ if __name__ == "__main__":
 
     if args.group:
         print_urls(
+            db_jsons=args.teacher_data,
             forms_json=args.forms_json,
             format=args.format,
             granularity=Granularity.GROUP,
@@ -101,6 +80,7 @@ if __name__ == "__main__":
         )
     elif args.stream:
         print_urls(
+            db_jsons=args.teacher_data,
             forms_json=args.forms_json,
             format=args.format,
             granularity=Granularity.STREAM,
@@ -108,6 +88,7 @@ if __name__ == "__main__":
         )
     elif args.speciality:
         print_urls(
+            db_jsons=args.teacher_data,
             forms_json=args.forms_json,
             format=args.format,
             granularity=Granularity.SPECIALITY,
@@ -115,6 +96,7 @@ if __name__ == "__main__":
         )
     elif args.faculty:
         print_urls(
+            db_jsons=args.teacher_data,
             forms_json=args.forms_json,
             format=args.format,
             granularity=Granularity.FACULTY,

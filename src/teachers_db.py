@@ -42,11 +42,15 @@ _op_to_str = {
 }
 
 
-@dataclass
-class Audience:
-    group: str
-    role: Role
-    is_elective: bool = False
+@dataclass(eq=True, frozen=True, slots=True)
+class Stream:
+    speciality: Speciality
+    year: str
+
+
+@dataclass(eq=True, frozen=True, slots=True)
+class Group:
+    name: str
 
     @property
     def speciality(self):
@@ -56,15 +60,34 @@ class Audience:
             "ФБ": Speciality.CYBERSECURITY,
             "ФE": Speciality.CYBERSECURITY,
         }
-        return letter_to_op[self.group[:1]]
+        return letter_to_op[self.name[:2]]
 
     @property
     def enrollment_year(self) -> str:
-        return self.group.split("-")[1][0]
+        return self.name.split("-")[1][0]
 
     @property
-    def stream(self) -> tuple[Speciality, str]:
-        return (self.speciality, self.enrollment_year)
+    def stream(self) -> Stream:
+        return Stream(self.speciality, self.enrollment_year)
+
+
+@dataclass(eq=True, frozen=True, slots=True)
+class Audience:
+    group: Group
+    role: Role
+    is_elective: bool = False
+
+    @property
+    def speciality(self):
+        return self.group.speciality
+
+    @property
+    def enrollment_year(self) -> str:
+        return self.group.enrollment_year
+
+    @property
+    def stream(self) -> Stream:
+        return self.group.stream
 
 
 @dataclass
@@ -73,23 +96,23 @@ class Course:
     audiences: list[Audience]
 
     @property
-    def specialities(self) -> Collection[Speciality]:
+    def specialities(self) -> set[Speciality]:
         return set(aud.speciality for aud in self.audiences)
 
     @property
-    def groups(self) -> Collection[str]:
+    def groups(self) -> set[Group]:
         return set(aud.group for aud in self.audiences)
 
     @property
-    def enrollment_years(self) -> Collection[str]:
+    def enrollment_years(self) -> set[str]:
         return set(aud.enrollment_year for aud in self.audiences)
 
     @property
-    def streams(self) -> Collection[tuple[Speciality, str]]:
+    def streams(self) -> set[Stream]:
         return set(aud.stream for aud in self.audiences)
 
     @property
-    def roles(self) -> Collection[Role]:
+    def roles(self) -> set[Role]:
         return set(aud.role for aud in self.audiences)
 
     @property
@@ -115,19 +138,19 @@ class Teacher:
         return sum(self.student_per_group.values())
 
     @property
-    def specialities(self) -> Collection[Speciality]:
+    def specialities(self) -> set[Speciality]:
         return set(chain.from_iterable(c.specialities for c in self.courses))
 
     @property
-    def groups(self) -> Collection[str]:
-        return self.student_per_group.keys()
+    def groups(self) -> set[Group]:
+        return set(Group(gname) for gname in self.student_per_group.keys())
 
     @property
-    def enrollment_years(self) -> Collection[str]:
+    def enrollment_years(self) -> set[str]:
         return set(chain.from_iterable(c.enrollment_years for c in self.courses))
 
     @property
-    def streams(self) -> Collection[tuple[Speciality, str]]:
+    def streams(self) -> set[Stream]:
         return set(chain.from_iterable(c.streams for c in self.courses))
 
     @property
@@ -142,11 +165,14 @@ class Teacher:
             nan_or, (aud.role for aud in all_audiences if predicate(aud)), None
         )
 
-    def overall_role_for_group(self, group: str) -> Optional[Role]:
-        return self.__overall_role_for(lambda aud: aud.group == group)
+    def overall_role_for_group(self, group: str | Group) -> Optional[Role]:
+        if isinstance(group, str):
+            return self.__overall_role_for(lambda aud: aud.group.name == group)
+        else:
+            return self.__overall_role_for(lambda aud: aud.group == group)
 
     @property
-    def roles(self) -> Collection[Role]:
+    def roles(self) -> set[Role]:
         all_roles = set()
         all_audiences = list(aud for c in self.courses for aud in c.audiences)
         for group in self.groups:
@@ -173,12 +199,8 @@ class Teacher:
     def overall_role_for_enrollment_year(self, year: str) -> Optional[Role]:
         return self.__overall_role_for(lambda aud: aud.enrollment_year == year)
 
-    def overall_role_for_stream(
-        self, speciality: Speciality, year: str
-    ) -> Optional[Role]:
-        return self.__overall_role_for(
-            lambda aud: aud.speciality == speciality and aud.enrollment_year == year
-        )
+    def overall_role_for_stream(self, stream: Stream) -> Optional[Role]:
+        return self.__overall_role_for(lambda aud: aud.stream == stream)
 
     def num_students_for_spec(self, speciality: Speciality) -> int:
         num_students = 0
@@ -196,11 +218,11 @@ class Teacher:
                     num_students += self.student_per_group[aud.group]
         return num_students
 
-    def num_students_for_stream(self, speciality: Speciality, year: str) -> int:
+    def num_students_for_stream(self, stream: Stream) -> int:
         num_students = 0
         for course in self.courses:
             for aud in course.audiences:
-                if aud.speciality == speciality and aud.enrollment_year == year:
+                if aud.stream == stream:
                     num_students += self.student_per_group[aud.group]
         return num_students
 
@@ -240,7 +262,7 @@ class TeacherDB:
             for course_info in teacher_info["courses"]:
                 course_name = course_info["name"]
                 course2audience[course_name] = Audience(
-                    group=group,
+                    group=Group(group),
                     role=_str_to_role[course_info["role"]],
                     is_elective=course_info.get("is_elective", False),
                 )
@@ -279,38 +301,39 @@ class TeacherDB:
     def __getitem__(self, name: str) -> Teacher:
         return self.db[name]
 
-    def get_all_groups(self) -> Iterable[str]:
+    def get_all_groups(self) -> Iterable[Group]:
         return set(chain.from_iterable(teacher.groups for teacher in self))
 
     def get_all_specialities(self) -> Iterable[Speciality]:
         return set(chain.from_iterable(teacher.specialities for teacher in self))
 
-    def get_all_streams(self) -> Iterable[tuple[Speciality, str]]:
+    def get_all_streams(self) -> Iterable[Stream]:
         return set(chain.from_iterable(teacher.streams for teacher in self))
 
     def __filter_by(self, predicate: Callable[[Audience], bool]) -> Iterable[Teacher]:
         for teacher in self.db.values():
             filtered_courses = []
-            groups = set()
+            group_names = set()
             for course in teacher.courses:
                 auds = list(filter(predicate, course.audiences))
                 if auds:
                     filtered_courses.append(Course(course.name, audiences=auds))
-                    groups = groups.union(aud.group for aud in auds)
+                    group_names = group_names.union(aud.group.name for aud in auds)
             if filtered_courses:
-                new_num_stud = {g: teacher.student_per_group[g] for g in groups}
+                new_num_stud = {g: teacher.student_per_group[g] for g in group_names}
                 yield Teacher(teacher.name, filtered_courses, new_num_stud)
 
-    def filter_by_group(self, group: str) -> Iterable[Teacher]:
-        yield from self.__filter_by(lambda aud: aud.group == group)
+    def filter_by_group(self, group: str | Group) -> Iterable[Teacher]:
+        if isinstance(group, str):
+            yield from self.__filter_by(lambda aud: aud.group.name == group)
+        else:
+            yield from self.__filter_by(lambda aud: aud.group == group)
 
     def filter_by_speciality(self, speciality: Speciality) -> Iterable[Teacher]:
         yield from self.__filter_by(lambda aud: aud.speciality == speciality)
 
-    def filter_by_stream(self, speciality: Speciality, year: str) -> Iterable[Teacher]:
-        yield from self.__filter_by(
-            lambda aud: aud.speciality == speciality and aud.enrollment_year == year
-        )
+    def filter_by_stream(self, stream: Stream) -> Iterable[Teacher]:
+        yield from self.__filter_by(lambda aud: aud.stream == stream)
 
     def __iter__(self) -> Iterator[Teacher]:
         return iter(self.db.values())

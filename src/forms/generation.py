@@ -7,13 +7,6 @@ from googleapiclient.discovery import Resource
 from src.teachers_db import Role, Teacher
 
 
-class Granularity(str, Enum):
-    GROUP = "group"
-    STREAM = "stream"
-    SPECIALITY = "speciality"
-    FACULTY = "faculty"
-
-
 class QuestionType(Enum):
     RATING_QUESTION = 0
     OPEN_QUESTION = 1

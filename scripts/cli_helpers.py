@@ -3,7 +3,7 @@ from enum import Enum
 from itertools import product
 from typing import Any
 
-from src.teachers_db import Speciality
+from src.teachers_db import Speciality, Stream
 
 
 class EnumAction(argparse.Action):
@@ -21,7 +21,7 @@ class EnumAction(argparse.Action):
         if not issubclass(enum_type, Enum):
             raise TypeError("type must be an Enum when using EnumAction")
 
-        kwargs.setdefault("choices", tuple(e.name for e in enum_type))
+        kwargs.setdefault("choices", tuple(e.value for e in enum_type))
 
         super(EnumAction, self).__init__(**kwargs)
 
@@ -36,7 +36,7 @@ class EnumAction(argparse.Action):
     ):
         # Convert value back into an Enum
         if isinstance(value, str):
-            value = self._enum[value]
+            value = self._enum(value)
             setattr(namespace, self.dest, value)
         elif value is None:
             raise argparse.ArgumentTypeError(
@@ -52,7 +52,8 @@ class ParseStreamAction(argparse.Action):
         self._enum = Speciality
 
         kwargs.setdefault(
-            "choices", tuple(f"{e.name}-{y}" for e, y in product(Speciality, range(10)))
+            "choices",
+            tuple(f"{e.value}-{y}" for e, y in product(Speciality, range(10))),
         )
 
         super(ParseStreamAction, self).__init__(**kwargs)
@@ -66,9 +67,9 @@ class ParseStreamAction(argparse.Action):
             )
 
         if isinstance(value, str):
-            speciality = self._enum[speciality]
+            speciality = self._enum(speciality)
             setattr(namespace, self.dest, value)
         else:
             raise argparse.ArgumentTypeError()
 
-        setattr(namespace, self.dest, (speciality, year_str))
+        setattr(namespace, self.dest, Stream(speciality, year_str))

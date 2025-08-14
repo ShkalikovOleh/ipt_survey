@@ -2,16 +2,18 @@ import argparse
 import json
 
 from cli_helpers import EnumAction
+from pyparsing import Group
 from tqdm import tqdm
 
-from src.forms.generation import Granularity, adapt_form_from_template
+from src.forms.filtering import Granularity
+from src.forms.generation import adapt_form_from_template
 from src.forms.publishing import give_access_to_organization, publish_form
 from src.forms.services import (
     get_drive_service,
     get_forms_service,
     get_gapi_credentials,
 )
-from src.teachers_db import Speciality, TeacherDB, load_teachers_db
+from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
 
 
 def prepare_funcs(db: TeacherDB, granularity: Granularity):
@@ -21,21 +23,21 @@ def prepare_funcs(db: TeacherDB, granularity: Granularity):
             def options_func():
                 return db.get_all_groups()
 
-            def metadata_func(group: str):
-                return {"group": group}
+            def metadata_func(group: Group):
+                return {"group": group.name}
 
-            def filter_func(group: str):
-                return db.filter_by_group(group)
+            def filter_func(group: Group):
+                return db.filter_by_group(group.name)
         case Granularity.STREAM:
 
             def options_func():
                 return db.get_all_streams()
 
-            def metadata_func(stream: tuple[Speciality, str]):
-                return {"speciality": stream[0], "year": stream[1]}
+            def metadata_func(stream: Stream):
+                return {"speciality": stream.speciality, "year": stream.year}
 
-            def filter_func(stream: tuple[Speciality, str]):
-                return db.filter_by_stream(speciality=stream[0], year=stream[1])
+            def filter_func(stream: Stream):
+                return db.filter_by_stream(stream)
         case Granularity.SPECIALITY:
 
             def options_func():
