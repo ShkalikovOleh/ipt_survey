@@ -3,10 +3,9 @@ import json
 from functools import partial
 from typing import Optional
 
-from cli_helpers import EnumAction, ParseStreamAction
-
 from src.forms.filtering import Granularity, fitler_urls
 from src.teachers_db import Speciality, Stream, load_teachers_db
+from src.utils.cli_helpers import EnumAction, ParseStreamAction
 
 
 def print_urls(

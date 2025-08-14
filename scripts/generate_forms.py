@@ -1,7 +1,6 @@
 import argparse
 import json
 
-from cli_helpers import EnumAction
 from pyparsing import Group
 from tqdm import tqdm
 
@@ -14,6 +13,7 @@ from src.forms.services import (
     get_gapi_credentials,
 )
 from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
+from src.utils.cli_helpers import EnumAction
 
 
 def prepare_funcs(db: TeacherDB, granularity: Granularity):
