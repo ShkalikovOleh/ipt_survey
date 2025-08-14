@@ -6,6 +6,7 @@ from typing import Optional
 from tqdm import tqdm
 
 from src.forms.filtering import Granularity, get_filter_func
+from src.forms.filtering import get_max_student_for_granularity
 from src.forms.responses import get_num_responses
 from src.forms.services import get_forms_service, get_gapi_credentials
 from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
@@ -116,26 +117,6 @@ def print_per_form_stats(
                 f"{form_responses}/{max_form_resp}",
                 form_responses / max_form_resp,
             )
-
-
-def get_max_student_for_granularity(
-    granularity: Granularity,
-    query: Optional[str | Speciality | Stream],
-    db: TeacherDB,
-    teacher_name: str,
-):
-    teacher = db[teacher_name]
-    match granularity:
-        case Granularity.GROUP:
-            max_num_responses = teacher.num_students_for_group(query)
-        case Granularity.STREAM:
-            max_num_responses = teacher.num_students_for_stream(query)
-        case Granularity.SPECIALITY:
-            max_num_responses = teacher.num_students_for_spec(query)
-        case Granularity.FACULTY:
-            max_num_responses = teacher.num_students
-
-    return max_num_responses
 
 
 if __name__ == "__main__":

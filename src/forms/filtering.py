@@ -1,8 +1,6 @@
 from enum import Enum
 from typing import Optional
 
-from tqdm import tqdm
-
 from src.teachers_db import Group, Speciality, Stream, TeacherDB
 
 
@@ -117,7 +115,27 @@ def fitler_urls(
         query=query,
         db=db,
     )
-    for teacher_name, forms in tqdm(forms_dict.items()):
+    for teacher_name, forms in forms_dict.items():
         for form in forms:
             if filter_func(teacher_name, form):
                 yield (teacher_name, form["resp_url"])
+
+
+def get_max_student_for_granularity(
+    granularity: Granularity,
+    query: Optional[str | Speciality | Stream],
+    db: TeacherDB,
+    teacher_name: str,
+):
+    teacher = db[teacher_name]
+    match granularity:
+        case Granularity.GROUP:
+            max_num_responses = teacher.num_students_for_group(query)
+        case Granularity.STREAM:
+            max_num_responses = teacher.num_students_for_stream(query)
+        case Granularity.SPECIALITY:
+            max_num_responses = teacher.num_students_for_spec(query)
+        case Granularity.FACULTY:
+            max_num_responses = teacher.num_students
+
+    return max_num_responses
