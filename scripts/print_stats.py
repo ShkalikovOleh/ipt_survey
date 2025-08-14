@@ -1,10 +1,10 @@
 import argparse
 import json
+from functools import partial
 from typing import Optional
 
-from tqdm import tqdm
-
 from cli_helpers import EnumAction, ParseStreamAction
+from tqdm import tqdm
 
 from src.forms.filtering import Granularity, get_filter_func
 from src.forms.responses import get_num_responses
@@ -132,48 +132,35 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    print_func = partial(
+        print_stats,
+        db_jsons=args.teacher_data,
+        forms_json=args.forms_json,
+        secrets_file=args.secrets_file,
+        token_file=args.token_file,
+    )
     if args.group:
-        print_stats(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            secrets_file=args.secrets_file,
-            token_file=args.token_file,
+        print_func(
             granularity=Granularity.GROUP,
             query=args.group,
         )
     elif args.stream:
-        print_stats(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            secrets_file=args.secrets_file,
-            token_file=args.token_file,
+        print_func(
             granularity=Granularity.STREAM,
             query=args.stream,
         )
     elif args.speciality:
-        print_stats(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            secrets_file=args.secrets_file,
-            token_file=args.token_file,
+        print_func(
             granularity=Granularity.SPECIALITY,
             query=args.speciality,
         )
     elif args.faculty:
-        print_stats(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            secrets_file=args.secrets_file,
-            token_file=args.token_file,
+        print_func(
             granularity=Granularity.FACULTY,
             query=None,
         )
     else:
-        print_stats(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            secrets_file=args.secrets_file,
-            token_file=args.token_file,
+        print_func(
             granularity=None,
             query=args.name,
         )

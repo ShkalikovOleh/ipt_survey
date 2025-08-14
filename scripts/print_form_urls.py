@@ -1,9 +1,10 @@
 import argparse
 import json
+from functools import partial
 from typing import Optional
 
-from tqdm import tqdm
 from cli_helpers import EnumAction, ParseStreamAction
+from tqdm import tqdm
 
 from src.forms.filtering import Granularity, get_filter_func
 from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
@@ -90,35 +91,29 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    print_urls_func = partial(
+        print_urls,
+        db_jsons=args.teacher_data,
+        forms_json=args.forms_json,
+        format=args.format,
+    )
     if args.group:
-        print_urls(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            format=args.format,
+        print_urls_func(
             granularity=Granularity.GROUP,
             query=args.group,
         )
     elif args.stream:
-        print_urls(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            format=args.format,
+        print_urls_func(
             granularity=Granularity.STREAM,
             query=args.stream,
         )
     elif args.speciality:
-        print_urls(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            format=args.format,
+        print_urls_func(
             granularity=Granularity.SPECIALITY,
             query=args.speciality,
         )
     elif args.faculty:
-        print_urls(
-            db_jsons=args.teacher_data,
-            forms_json=args.forms_json,
-            format=args.format,
+        print_urls_func(
             granularity=Granularity.FACULTY,
             query=None,
         )
