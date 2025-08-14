@@ -202,29 +202,31 @@ class Teacher:
     def overall_role_for_stream(self, stream: Stream) -> Optional[Role]:
         return self.__overall_role_for(lambda aud: aud.stream == stream)
 
+    def num_students_for_group(self, group: str | Group) -> int:
+        if isinstance(group, str):
+            return self.student_per_group.get(group, 0)
+        return self.student_per_group.get(group.name, 0)
+
     def num_students_for_spec(self, speciality: Speciality) -> int:
-        num_students = 0
-        for course in self.courses:
-            for aud in course.audiences:
-                if aud.speciality == speciality:
-                    num_students += self.student_per_group[aud.group]
-        return num_students
+        return sum(
+            self.student_per_group[group.name]
+            for group in self.groups
+            if group.speciality == speciality
+        )
 
     def num_students_for_enrollment_year(self, year: str) -> int:
-        num_students = 0
-        for course in self.courses:
-            for aud in course.audiences:
-                if aud.enrollment_year == year:
-                    num_students += self.student_per_group[aud.group]
-        return num_students
+        return sum(
+            self.student_per_group[group.name]
+            for group in self.groups
+            if group.enrollment_year == year
+        )
 
     def num_students_for_stream(self, stream: Stream) -> int:
-        num_students = 0
-        for course in self.courses:
-            for aud in course.audiences:
-                if aud.stream == stream:
-                    num_students += self.student_per_group[aud.group]
-        return num_students
+        return sum(
+            self.student_per_group[group.name]
+            for group in self.groups
+            if group.stream == stream
+        )
 
     def __post_init__(self):
         assert len(self.name.split()) == 3
