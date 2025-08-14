@@ -1,18 +1,17 @@
-from functools import partial
 import json
 from argparse import ArgumentParser, Namespace
+from functools import partial
 from typing import Callable, Iterable
 
 from telegram import Update
 from telegram.ext import (
     Application,
-    ContextTypes,
     # filters,
     CommandHandler,
+    ContextTypes,
 )
 
-from src.forms.filtering import fitler_urls
-from src.forms.filtering import Granularity
+from src.forms.filtering import Granularity, fitler_urls
 from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
 
 
@@ -85,11 +84,46 @@ async def get_all_links(
     await send_links(update, context, links)
 
 
+async def get_teacher_links(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    forms_dict: dict[str, list[str, str]],
+    forms_granularity: Granularity,
+):
+    name = " ".join(context.args)
+    messages = []
+    for teacher_name, forms in forms_dict.items():
+        if teacher_name == name:
+            for form in forms:
+                url = form["resp_url"]
+                match forms_granularity:
+                    case Granularity.GROUP:
+                        messages.append(f"[{form['group']}]({url})")
+                    case Granularity.STREAM:
+                        messages.append(
+                            f"[{form['speciality']}\-{form['year']}]({url})"
+                        )
+                    case Granularity.SPECIALITY:
+                        messages.append(f"[{form['speciality']}]({url})")
+                    case Granularity.FACULTY:
+                        messages.append(f"[ФТІ]({url})")
+
+    if messages:
+        await send_message(
+            update, context, "\n".join(messages), parse_mode="MarkdownV2"
+        )
+    else:
+        await send_message(update, context, "No links for this teacher")
+
+
 async def send_links(
     update: Update, context: ContextTypes.DEFAULT_TYPE, links: Iterable[tuple[str, str]]
 ):
     message = "\n".join([f"[{teacher_name}]({link})" for teacher_name, link in links])
-    await send_message(update, context, message, parse_mode="MarkdownV2")
+    if message:
+        await send_message(update, context, message, parse_mode="MarkdownV2")
+    else:
+        await send_message(update, context, "No links for this query")
 
 
 async def send_message(
@@ -150,7 +184,7 @@ def run_bot(
 
     application.add_handler(
         create_link_command(
-            "get_group_links",
+            "lgroup",
             get_group_links,
             teachers_db=teachers_db,
             forms_dict=forms_dict,
@@ -159,7 +193,7 @@ def run_bot(
     )
     application.add_handler(
         create_link_command(
-            "get_stream_links",
+            "lstream",
             get_stream_links,
             teachers_db=teachers_db,
             forms_dict=forms_dict,
@@ -168,7 +202,7 @@ def run_bot(
     )
     application.add_handler(
         create_link_command(
-            "get_spec_links",
+            "lspec",
             get_speciality_links,
             teachers_db=teachers_db,
             forms_dict=forms_dict,
@@ -177,11 +211,21 @@ def run_bot(
     )
     application.add_handler(
         create_link_command(
-            "get_all_links",
+            "lall",
             get_all_links,
             teachers_db=teachers_db,
             forms_dict=forms_dict,
             forms_granularity=forms_granularity,
+        )
+    )
+    application.add_handler(
+        CommandHandler(
+            "lname",
+            callback=partial(
+                get_teacher_links,
+                forms_dict=forms_dict,
+                forms_granularity=forms_granularity,
+            ),
         )
     )
 
