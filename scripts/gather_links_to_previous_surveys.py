@@ -1,7 +1,9 @@
 import argparse
+from collections import defaultdict
 import json
 from collections.abc import Callable
 from datetime import datetime
+from re import I
 from typing import Any, Iterable
 
 
@@ -49,6 +51,15 @@ def parse_message_history(
             yield text, message["id"], str_sem
 
 
+def get_channel_link_part(channel_id: str) -> str:
+    id2username = {
+        1198212824: "analyticsFTI",
+        1896101333: "ipt_sight",
+        2451504931: "ipt_bee",
+    }
+    return id2username.get(channel_id, f"c/{channel_id}")
+
+
 def gather_links(jsons: list[str], out_path: str):
     links_dict: dict[str, list[dict[str, str]]] = {}
     for path in jsons:
@@ -59,7 +70,7 @@ def gather_links(jsons: list[str], out_path: str):
 
         for name, id, sem_year in parse_message_history(history["messages"]):
             info = {
-                "link": f"https://t.me/c/{channel_id}/{id}",
+                "link": f"https://t.me/{get_channel_link_part(channel_id)}/{id}",
                 "channel_name": channel_name,
                 "semester": sem_year,
             }
