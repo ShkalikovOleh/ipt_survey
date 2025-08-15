@@ -1,14 +1,7 @@
-from enum import Enum
 from typing import Optional
 
+from src.forms.generation import Granularity
 from src.teachers_db import Group, Speciality, Stream, TeacherDB
-
-
-class Granularity(str, Enum):
-    GROUP = "group"
-    STREAM = "stream"
-    SPECIALITY = "speciality"
-    FACULTY = "faculty"
 
 
 def get_filter_func(

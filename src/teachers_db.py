@@ -47,6 +47,15 @@ class Stream:
     speciality: Speciality
     year: str
 
+    def __str__(self):
+        op_to_letters = {
+            Speciality.APPLIED_MATH: "ФІ",
+            Speciality.APPLIED_PHYSICS: "ФФ",
+            Speciality.CYBERSECURITY: "ФБ",
+            Speciality.CYBERSECURITY: "ФE",
+        }
+        return f"{op_to_letters[self.speciality]} - {self.year}x"
+
 
 @dataclass(eq=True, frozen=True, slots=True)
 class Group:

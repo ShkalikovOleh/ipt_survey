@@ -1,11 +1,11 @@
 import argparse
 import json
+from typing import Optional
 
 from pyparsing import Group
 from tqdm import tqdm
 
-from src.forms.filtering import Granularity
-from src.forms.generation import adapt_form_from_template
+from src.forms.generation import Granularity, adapt_form_from_template
 from src.forms.publishing import give_access_to_organization, publish_form
 from src.forms.services import (
     get_drive_service,
@@ -67,6 +67,7 @@ def generate_forms(
     template_id: str,
     dest_folder_id: str,
     granularity: Granularity,
+    stats_granularity: Optional[Granularity],
     secrets_file: str,
     token_file: str,
     out_path: str,
@@ -89,6 +90,7 @@ def generate_forms(
                 drive_service=drive_serive,
                 template_id=template_id,
                 dest_folder_id=dest_folder_id,
+                stats_granularity=stats_granularity,
             )
             publish_form(form_id=form_id, forms_service=forms_service)
             give_access_to_organization(form_id=form_id, drive_service=drive_serive)
@@ -102,11 +104,15 @@ def generate_forms(
                 forms_dict[teacher.name] = [form_info]
 
     with open(out_path, "w") as file:
+        forms_info = {
+            "granularity": granularity,
+            "forms": forms_dict,
+        }
+        if stats_granularity:
+            forms_info["stats_granularity"] = stats_granularity
+
         json.dump(
-            {
-                "granularity": granularity,
-                "forms": forms_dict,
-            },
+            forms_info,
             file,
             ensure_ascii=False,
         )
@@ -154,6 +160,13 @@ if __name__ == "__main__":
         help="Specify the granularity level of forms",
     )
     parser.add_argument(
+        "--stats_granularity",
+        type=Granularity,
+        action=EnumAction,
+        required=False,
+        help="Specify the granularity level of optional question for statistics",
+    )
+    parser.add_argument(
         "--out_path",
         type=str,
         required=True,
@@ -167,6 +180,7 @@ if __name__ == "__main__":
         template_id=args.template_id,
         dest_folder_id=args.dest_folder_id,
         granularity=args.granularity,
+        stats_granularity=args.stats_granularity,
         secrets_file=args.secrets_file,
         token_file=args.token_file,
         out_path=args.out_path,

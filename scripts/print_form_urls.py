@@ -3,7 +3,8 @@ import json
 from functools import partial
 from typing import Optional
 
-from src.forms.filtering import Granularity, fitler_urls
+from src.forms.filtering import fitler_urls
+from src.forms.generation import Granularity
 from src.teachers_db import Speciality, Stream, load_teachers_db
 from src.utils.cli_helpers import EnumAction, ParseStreamAction
 

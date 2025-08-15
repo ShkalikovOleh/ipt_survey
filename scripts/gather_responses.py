@@ -1,18 +1,17 @@
 import argparse
 import json
-from tqdm import tqdm
 
 import pandas as pd
+from tqdm import tqdm
 
-from src.forms.filtering import Granularity
+from src.analysis.parsers import parse_bool, parse_nan_grade, parse_str
 from src.forms.responses import gather_responses_to_pandas
+from src.forms.generation import Granularity
 from src.forms.services import (
     get_forms_service,
     get_gapi_credentials,
 )
-from src.analysis.parsers import parse_bool, parse_nan_grade, parse_str
 from src.teachers_db import load_teachers_db
-
 
 columns_to_parser = {
     "Ввічливість і загальне враження від спілкування": parse_nan_grade,

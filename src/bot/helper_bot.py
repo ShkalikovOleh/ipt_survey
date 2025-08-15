@@ -1,7 +1,7 @@
 import json
+import math
 from argparse import ArgumentParser, Namespace
 from functools import partial
-import math
 from typing import Callable, Iterable
 
 from googleapiclient.discovery import Resource
@@ -14,11 +14,11 @@ from telegram.ext import (
 )
 
 from src.forms.filtering import (
-    Granularity,
     fitler_urls,
     get_filter_func,
     get_max_student_for_granularity,
 )
+from src.forms.generation import Granularity
 from src.forms.responses import get_num_responses
 from src.forms.services import get_forms_service, get_gapi_credentials
 from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db

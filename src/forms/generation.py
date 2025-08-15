@@ -12,6 +12,13 @@ class QuestionType(Enum):
     OPEN_QUESTION = 1
 
 
+class Granularity(str, Enum):
+    GROUP = "group"
+    STREAM = "stream"
+    SPECIALITY = "speciality"
+    FACULTY = "faculty"
+
+
 @dataclass(frozen=True)
 class Question:
     question: str
@@ -27,6 +34,7 @@ def adapt_form_from_template(
     template_id: str,
     dest_folder_id: str,
     insert_loc: Optional[int] = None,
+    stats_granularity: Optional[Granularity] = None,
 ) -> tuple[str, str]:
     form_id = copy_form(teacher.name, drive_service, template_id, dest_folder_id)
     form = get_form(forms_service, form_id)
@@ -98,6 +106,9 @@ def adapt_form_from_template(
                 delete_item(
                     start_sec_loc + 1, requests
                 )  # bug with location in GoogleFormsAPI (after every delete loc changes)
+
+    if stats_granularity:
+        append_optional_stats_question(teacher, stats_granularity, requests)
 
     update_form_body(requests, forms_service, form_id, ret_form=False)
     return form_id, form["responderUri"]
@@ -190,6 +201,46 @@ def append_branching_question(
                     "questionItem": {
                         "question": {
                             "required": True,
+                            "choiceQuestion": {"type": "RADIO", "options": options},
+                        },
+                    },
+                },
+                "location": {"index": 0},
+            }
+        }
+    )
+
+
+def append_optional_stats_question(
+    teacher: Teacher, granularity: Granularity, requests: list[dict[str, Any]]
+) -> None:
+    match granularity:
+        case Granularity.GROUP:
+            question = "Оберіть вашу групу"
+            options = [{"value": group.name} for group in teacher.groups]
+        case Granularity.STREAM:
+            question = "Оберіть ваш поток"
+            options = [{"value": str(stream)} for stream in teacher.streams]
+        case Granularity.SPECIALITY:
+            question = "Оберіть вашу спеціальність"
+            options = [{"value": str(spec)} for spec in teacher.specialities]
+        case Granularity.FACULTY:
+            return
+
+    if len(options) < 2:
+        print(teacher.name, options)
+        return
+
+    requests.append(
+        {
+            "createItem": {
+                "item": {
+                    "title": question,
+                    "description": "Це питання є необов'язковим, інформація використовуєтьс виключно для "
+                    "спостереженням за активністю респондентів",
+                    "questionItem": {
+                        "question": {
+                            "required": False,
                             "choiceQuestion": {"type": "RADIO", "options": options},
                         },
                     },
