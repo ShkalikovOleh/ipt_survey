@@ -24,13 +24,11 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
-LICENSE
-README.md
-.flake8
-llms
 *.egg-info
 notebooks
 examples
 photos
 ankets
-pers_state.json
+data
+assets
+**/*.json

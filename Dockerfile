@@ -1,4 +1,6 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
+# make uv avaliable
+COPY --from=ghcr.io/astral-sh/uv:0.7.20 /uv /uvx /bin/
 
 # Keeps Python from generating .pyc files in the container
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -6,17 +8,14 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
-# Install requirements
-COPY requirements.txt .
-RUN python -m pip install --no-cache-dir -r requirements.txt
-RUN python -m pip install --no-cache-dir 'python-telegram-bot[job-queue]'
-
+ADD . /app
 WORKDIR /app
-COPY . /app
-RUN python -m pip install .
+
+# Install requirements
+RUN uv sync --locked --no-editable
 
 # Creates a non-root user with an explicit UID and adds permission to access the /app folder
 # RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
 # USER appuser
 
-CMD ["python", "src/bot/bot.py", "bot_cfg.json"]
+CMD ["uv", "run", "src/bot/posting_bot.py", "bot_cfg.json"]
