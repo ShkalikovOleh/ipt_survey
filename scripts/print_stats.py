@@ -20,6 +20,7 @@ def print_stats(
     token_file: str,
     granularity: Optional[Granularity],
     query: Optional[str | Speciality | Stream],
+    print_all: bool = False,
 ):
     creds = get_gapi_credentials(cred_file=secrets_file, token_store_file=token_file)
     forms_service = get_forms_service(creds)
@@ -30,6 +31,9 @@ def print_stats(
         forms_dict: dict[str, list[dict[str, str]]] = forms_info["forms"]
 
     db = load_teachers_db(db_jsons)
+
+    if print_all:
+        granularity = Granularity.FACULTY
 
     if granularity:
         filter_func = get_filter_func(
@@ -71,6 +75,8 @@ def print_stats(
                 f"{num_responses}/{max_num_responses}",
                 num_responses / max_num_responses,
             )
+            if not print_all:
+                break
 
 
 def print_per_form_stats(
@@ -160,6 +166,7 @@ if __name__ == "__main__":
         action=ParseStreamAction,
     )
     granularity_group.add_argument("--faculty", action="store_true")
+    granularity_group.add_argument("--all", action="store_true")
     granularity_group.add_argument("--name", type=str)
 
     args = parser.parse_args()
@@ -191,8 +198,10 @@ if __name__ == "__main__":
             granularity=Granularity.FACULTY,
             query=None,
         )
-    else:
+    elif args.name:
         print_func(
             granularity=None,
             query=args.name,
         )
+    else:
+        print_func(granularity=None, query=args.name, print_all=True)
