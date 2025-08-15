@@ -1,9 +1,7 @@
 import argparse
-from collections import defaultdict
 import json
 from collections.abc import Callable
 from datetime import datetime
-from re import I
 from typing import Any, Iterable
 
 

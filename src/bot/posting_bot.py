@@ -4,14 +4,20 @@ import os
 import time
 from argparse import ArgumentParser, Namespace
 from collections.abc import Generator, Iterable, Mapping
-from typing import TypeVar
+from typing import Optional, TypeVar
 
 import dateutil
 import dateutil.parser
 import pandas as pd
 import pytz
 from telegram import Update
-from telegram.ext import Application, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    ContextTypes,
+    MessageHandler,
+    filters,
+    AIORateLimiter,
+)
 
 from src.teachers_db import TeacherDB, load_teachers_db
 
@@ -68,7 +74,9 @@ async def post_next_teacher_results(
     persistent_state: PersistentState,
 ):
     curr_pos = persistent_state.idx
-    if not persistent_state.publication_allowed or curr_pos > len(order_of_publication):
+    if not persistent_state.publication_allowed or curr_pos >= len(
+        order_of_publication
+    ):
         return
 
     teacher_name = order_of_publication[curr_pos]
@@ -97,6 +105,7 @@ async def add_comments(
     n_batch: int,
     col2desc: dict[str, list[str] | str],
     col2emoji: dict[str, list[str] | str],
+    prev_surveys_links: Optional[dict[str, list[dict[str, str]]]] = None,
 ):
     name = update.message.caption.splitlines()[0]
     if name in df_results.index:
@@ -110,6 +119,27 @@ async def add_comments(
                 await add_paired_comments_batch(
                     update, context, data, col, n_batch, col2desc, col2emoji
                 )
+
+        if prev_surveys_links:
+            await add_prev_links(update, context, prev_surveys_links, name)
+
+
+async def add_prev_links(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    prev_surveys_links: dict[str, list[dict[str, str]]],
+    name: str,
+):
+    links_messages = ["Посилання на минулі опитування:\n"]
+    for links_info in prev_surveys_links.get(name, []):
+        links_messages.append(
+            f"🔻 [{links_info['channel_name']} \\- {links_info['semester']}]({links_info['link']})"
+        )
+
+    if len(links_messages) > 1:
+        await post_comment(
+            update, context, "\n".join(links_messages), parse_mode="MarkdownV2"
+        )
 
 
 async def add_paired_comments_batch(
@@ -155,15 +185,10 @@ async def add_comments_batch(
 
 
 async def post_comment(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, comment: str
+    update: Update, context: ContextTypes.DEFAULT_TYPE, comment: str, parse_mode="html"
 ):
-    await context.bot.send_message(
-        chat_id=update.message.chat_id,
-        text=comment,
-        reply_to_message_id=update.message.id,
-        parse_mode="html",
-    )
-    time.sleep(4)  # No more than 20 message per minute
+    await update.message.reply_text(text=comment, parse_mode=parse_mode)
+    # time.sleep(4)  # No more than 20 message per minute
 
 
 def run_bot(
@@ -179,9 +204,16 @@ def run_bot(
     col2desc: dict[str, list[str] | str],
     col2emoji: dict[str, list[str] | str],
     persistent_state: PersistentState,
+    prev_surveys_links: Optional[dict[str, list[dict[str, str]]]] = None,
 ):
+    rate_limiter = AIORateLimiter(max_retries=10)
     application = (
-        Application.builder().read_timeout(120).write_timeout(120).token(token).build()
+        Application.builder()
+        .read_timeout(120)
+        .write_timeout(120)
+        .rate_limiter(rate_limiter)
+        .token(token)
+        .build()
     )
 
     # Schedule posting every interval_min
@@ -207,6 +239,7 @@ def run_bot(
             n_batch=n_batch,
             col2desc=col2desc,
             col2emoji=col2emoji,
+            prev_surveys_links=prev_surveys_links,
         )
 
     channel_post_handler = MessageHandler(
@@ -236,6 +269,12 @@ def main(args: Namespace):
     df = pd.read_feather(cfg["survey_results"])
     teachers_db = load_teachers_db(cfg["teachers_info_files"])
 
+    if "prev_surveys_links" in cfg:
+        with open(cfg["prev_surveys_links"]) as file:
+            prev_surveys_links = json.load(file)
+    else:
+        prev_surveys_links = None
+
     run_bot(
         token=cfg["TG_TOKEN"],
         channel_id=cfg["channel_id"],
@@ -251,6 +290,7 @@ def main(args: Namespace):
         persistent_state=PersistentState(
             cfg["working_hours"]["min"], cfg["working_hours"]["max"]
         ),
+        prev_surveys_links=prev_surveys_links,
     )
 
 
