@@ -12,10 +12,9 @@ def get_first(it: Iterable[Any], pred: Callable[[Any], bool]):
 def determine_year_and_semester(pub_date: datetime) -> str:
     if pub_date.month <= 6:
         sem = "I"
-        year = pub_date.year - 1
     else:
         sem = "II"
-        year = pub_date.year
+    year = pub_date.year - 1
     return f"{sem} семестр {year}/{year + 1}"
 
 
