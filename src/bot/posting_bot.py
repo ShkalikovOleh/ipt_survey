@@ -1,7 +1,7 @@
+import asyncio
 import datetime
 import json
 import os
-import time
 from argparse import ArgumentParser, Namespace
 from collections.abc import Generator, Iterable, Mapping
 from typing import Optional, TypeVar
@@ -12,11 +12,11 @@ import pandas as pd
 import pytz
 from telegram import Update
 from telegram.ext import (
+    AIORateLimiter,
     Application,
     ContextTypes,
     MessageHandler,
     filters,
-    AIORateLimiter,
 )
 
 from src.teachers_db import TeacherDB, load_teachers_db
@@ -24,7 +24,7 @@ from src.teachers_db import TeacherDB, load_teachers_db
 T = TypeVar("T")
 
 
-def batched(iterable: Iterable[T], n) -> Generator[T]:
+def batched(iterable: Iterable[T], n) -> Generator[list[T]]:
     current_batch = []
     for item in iterable:
         current_batch.append(item)
@@ -188,12 +188,11 @@ async def post_comment(
     update: Update, context: ContextTypes.DEFAULT_TYPE, comment: str, parse_mode="html"
 ):
     await update.message.reply_text(text=comment, parse_mode=parse_mode)
-    # time.sleep(4)  # No more than 20 message per minute
 
 
 def run_bot(
     token: str,
-    channel_id: str,
+    channel_id: str | int,
     teachers_db: TeacherDB,
     df: pd.DataFrame,
     viz_folder: str,
@@ -242,14 +241,24 @@ def run_bot(
             prev_surveys_links=prev_surveys_links,
         )
 
+    channel_info = get_channel_info(channel_id, application.bot)
     channel_post_handler = MessageHandler(
-        filters.User(777000) & filters.Caption(),  # TG_ID
+        filters.User(777000)
+        & filters.Caption()
+        & filters.Chat(chat_id=channel_info.linked_chat_id),  # Only from TG
         comment_func,
     )
     application.add_handler(channel_post_handler)
 
     # Start listening
     application.run_polling()
+
+
+def get_channel_info(channel_id: int | str, bot):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    channel_info = loop.run_until_complete(bot.get_chat(chat_id=channel_id))
+    return channel_info
 
 
 def schedule_posting(start_time, interval_min: int, job_queue, post_func):
