@@ -5,13 +5,13 @@ import pandas as pd
 from tqdm import tqdm
 
 from src.analysis.parsers import parse_bool, parse_nan_grade, parse_str
+from src.forms.generation import Granularity, get_stats_question
 from src.forms.responses import gather_responses_to_pandas
-from src.forms.generation import Granularity
 from src.forms.services import (
     get_forms_service,
     get_gapi_credentials,
 )
-from src.teachers_db import load_teachers_db
+from src.teachers_db import Stream, load_teachers_db
 
 columns_to_parser = {
     "Ввічливість і загальне враження від спілкування": parse_nan_grade,
@@ -48,7 +48,12 @@ def gather_responses(
     with open(forms_json, "r", encoding="utf-8") as file:
         forms_info = json.load(file)
         forms_granularity = forms_info["granularity"]
+        stats_granularity = forms_info.get("stats_granularity")
         forms_dict: dict[str, list[dict[str, str]]] = forms_info["forms"]
+
+    if stats_granularity:
+        stats_column = get_stats_question(stats_granularity)
+        columns_to_parser[stats_column] = parse_str
 
     df = pd.DataFrame()
     for name, forms in tqdm(forms_dict.items()):
@@ -71,9 +76,41 @@ def gather_responses(
                 case Granularity.SPECIALITY:
                     teacher_df.insert(2, "speciality", form["speciality"])
 
+            if stats_granularity:
+                add_info_from_stats_question(
+                    forms_granularity, stats_granularity, stats_column, teacher_df
+                )
+
             df = pd.concat([df, teacher_df], axis=0)
 
     df.to_parquet(out_path)
+
+
+def add_info_from_stats_question(
+    forms_granularity: Granularity,
+    stats_granularity: Granularity,
+    stats_column: str,
+    teacher_df: pd.DataFrame,
+):
+    if stats_granularity < forms_granularity:
+        match stats_granularity:
+            case Granularity.GROUP:
+                teacher_df.rename({stats_column: "group"})
+            case Granularity.STREAM:
+                if forms_granularity > Granularity.SPECIALITY:
+                    teacher_df["speciality"] = teacher_df[stats_column].map(
+                        lambda val: Stream.from_str(val).speciality,
+                        na_action="ignore",
+                    )
+                teacher_df["year"] = teacher_df[stats_column].map(
+                    lambda val: Stream.from_str(val).year,
+                    na_action="ignore",
+                )
+                teacher_df.drop([stats_column], axis=0, inplace=True)
+            case Granularity.SPECIALITY:
+                teacher_df.rename({stats_column: "speciality"})
+    else:
+        teacher_df.drop([stats_column], axis=0, inplace=True)
 
 
 if __name__ == "__main__":

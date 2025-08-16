@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
+from functools import total_ordering
 from typing import Any, Optional
 
 from googleapiclient.discovery import Resource
@@ -12,11 +13,19 @@ class QuestionType(Enum):
     OPEN_QUESTION = 1
 
 
-class Granularity(str, Enum):
+@total_ordering
+class Granularity(StrEnum):
     GROUP = "group"
     STREAM = "stream"
     SPECIALITY = "speciality"
     FACULTY = "faculty"
+
+    def __lt__(self, other):
+        if isinstance(other, Granularity):
+            return self._member_names_.index(self.name) > self._member_names_.index(
+                other.name
+            )
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)
@@ -211,18 +220,26 @@ def append_branching_question(
     )
 
 
+def get_stats_question(stats_granularity: Granularity):
+    match stats_granularity:
+        case Granularity.GROUP:
+            stats_column = "Оберіть вашу групу"
+        case Granularity.SPECIALITY:
+            stats_column = "Оберіть вашу спеціальність"
+        case Granularity.STREAM:
+            stats_column = "Оберіть ваш поток"
+    return stats_column
+
+
 def append_optional_stats_question(
     teacher: Teacher, granularity: Granularity, requests: list[dict[str, Any]]
 ) -> None:
     match granularity:
         case Granularity.GROUP:
-            question = "Оберіть вашу групу"
             options = [{"value": group.name} for group in teacher.groups]
         case Granularity.STREAM:
-            question = "Оберіть ваш поток"
             options = [{"value": str(stream)} for stream in teacher.streams]
         case Granularity.SPECIALITY:
-            question = "Оберіть вашу спеціальність"
             options = [{"value": str(spec)} for spec in teacher.specialities]
         case Granularity.FACULTY:
             return
@@ -235,7 +252,7 @@ def append_optional_stats_question(
         {
             "createItem": {
                 "item": {
-                    "title": question,
+                    "title": get_stats_question(granularity),
                     "description": "Це питання є необов'язковим, інформація використовуєтьс виключно для "
                     "спостереженням за активністю респондентів",
                     "questionItem": {

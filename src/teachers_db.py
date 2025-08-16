@@ -2,7 +2,7 @@ import json
 import operator
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
-from enum import Enum, Flag, auto
+from enum import Flag, StrEnum, auto
 from functools import reduce
 from itertools import chain
 from typing import Optional
@@ -17,6 +17,10 @@ class Role(Flag):
     def __str__(self):
         return _role_to_str[self]
 
+    @staticmethod
+    def from_str(value: str) -> "Role":
+        return _str_to_role[value]
+
 
 _role_to_str = {
     Role.LECTURER: "Лектор",
@@ -26,13 +30,17 @@ _role_to_str = {
 _str_to_role = {v: k for k, v in _role_to_str.items()}
 
 
-class Speciality(str, Enum):
+class Speciality(StrEnum):
     APPLIED_MATH = "F1"
     APPLIED_PHYSICS = "E6"
     CYBERSECURITY = "F5"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return _op_to_str[self]
+
+    @staticmethod
+    def from_str(value: str) -> "Speciality":
+        return _str_to_op[value]
 
 
 _op_to_str = {
@@ -40,6 +48,14 @@ _op_to_str = {
     Speciality.APPLIED_PHYSICS: "Прикладна фізика",
     Speciality.CYBERSECURITY: "Кібербезпека",
 }
+_str_to_op = {v: k for k, v in _op_to_str.items()}
+_op_to_spec_code = {
+    Speciality.APPLIED_MATH: "ФІ",
+    Speciality.APPLIED_PHYSICS: "ФФ",
+    Speciality.CYBERSECURITY: "ФБ",
+    Speciality.CYBERSECURITY: "ФE",
+}
+_spec_code_to_spec = {v: k for k, v in _op_to_str.items()}
 
 
 @dataclass(eq=True, frozen=True, slots=True)
@@ -48,13 +64,13 @@ class Stream:
     year: str
 
     def __str__(self):
-        op_to_letters = {
-            Speciality.APPLIED_MATH: "ФІ",
-            Speciality.APPLIED_PHYSICS: "ФФ",
-            Speciality.CYBERSECURITY: "ФБ",
-            Speciality.CYBERSECURITY: "ФE",
-        }
-        return f"{op_to_letters[self.speciality]} - {self.year}x"
+        return f"{_op_to_spec_code[self.speciality]}-{self.year}x"
+
+    @staticmethod
+    def from_str(value: str) -> "Stream":
+        spec_str, year = value.split("-")
+        spec = _spec_code_to_spec[spec_str]
+        return Stream(speciality=spec, year=year)
 
 
 @dataclass(eq=True, frozen=True, slots=True)
@@ -274,7 +290,7 @@ class TeacherDB:
                 course_name = course_info["name"]
                 course2audience[course_name] = Audience(
                     group=Group(group),
-                    role=_str_to_role[course_info["role"]],
+                    role=Role.from_str(course_info["role"]),
                     is_elective=course_info.get("is_elective", False),
                 )
 

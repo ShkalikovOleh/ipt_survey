@@ -1,5 +1,6 @@
 import argparse
 import json
+from collections import defaultdict
 from typing import Optional
 
 from pyparsing import Group
@@ -74,13 +75,16 @@ def generate_forms(
 ):
     db = load_teachers_db(teacher_jsons)
 
+    if stats_granularity:
+        assert stats_granularity < granularity
+
     ops_func, filter_func, meta_func = prepare_funcs(db, granularity)
 
     creds = get_gapi_credentials(cred_file=secrets_file, token_store_file=token_file)
     forms_service = get_forms_service(creds)
     drive_serive = get_drive_service(creds)
 
-    forms_dict: dict[str, list[dict[str, str]]] = {}
+    forms_dict: dict[str, list[dict[str, str]]] = defaultdict(lambda: [])
     options = list(ops_func())
     for option in tqdm(options):
         for teacher in tqdm(filter_func(option)):
@@ -98,10 +102,7 @@ def generate_forms(
             form_info = meta_func(option)
             form_info["form_id"] = form_id
             form_info["resp_url"] = resp_url
-            if teacher.name in forms_dict:
-                forms_dict[teacher.name].append(form_info)
-            else:
-                forms_dict[teacher.name] = [form_info]
+            forms_dict[teacher.name].append(form_info)
 
     with open(out_path, "w") as file:
         forms_info = {

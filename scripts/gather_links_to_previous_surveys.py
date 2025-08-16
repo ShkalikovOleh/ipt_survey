@@ -1,5 +1,6 @@
 import argparse
 import json
+from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Iterable
@@ -59,7 +60,7 @@ def get_channel_link_part(channel_id: str) -> str:
 
 
 def gather_links(jsons: list[str], out_path: str):
-    links_dict: dict[str, list[dict[str, str]]] = {}
+    links_dict: dict[str, list[dict[str, str]]] = defaultdict(lambda: [])
     for path in jsons:
         with open(path) as file:
             history = json.load(file)
@@ -72,10 +73,7 @@ def gather_links(jsons: list[str], out_path: str):
                 "channel_name": channel_name,
                 "semester": sem_year,
             }
-            if name in links_dict:
-                links_dict[name].append(info)
-            else:
-                links_dict[name] = [info]
+            links_dict[name].append(info)
 
     with open(out_path, "w") as file:
         json.dump(links_dict, file, ensure_ascii=False)
