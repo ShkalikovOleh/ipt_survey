@@ -8,14 +8,17 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
-ADD . /app
 WORKDIR /app
 
 # Install requirements
-RUN uv sync --locked --no-editable
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-editable
 
-# Creates a non-root user with an explicit UID and adds permission to access the /app folder
-# RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
-# USER appuser
+ADD . /app
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-editable
 
 CMD ["uv", "run", "src/bot/posting_bot.py", "bot_cfg.json"]
