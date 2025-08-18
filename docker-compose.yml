@@ -6,7 +6,11 @@ services:
       context: .
       dockerfile: ./Dockerfile
     volumes:
-      - ${PWD}/bot_cfg.json:/app/bot_cfg.json
-      - ${PWD}/pers_state.json:/app/pers_state.json
-      - ${PWD}/data/:/app/data
-      - ${PWD}/ankets/:/app/ankets
+      - ./data/:/app/data
+    configs:
+      - source: bot_config
+        target: /app/bot_cfg.json
+
+configs:
+  bot_config:
+    file: ./bot_cfg.json

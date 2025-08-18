@@ -9,8 +9,9 @@
         "data/year_3_mmad.json",
         "data/year_3_mmzi.json"
     ],
-    "survey_results": "data/survey_results_aggregated.arrow",
-    "viz_folder": "ankets",
+    "survey_results": "data/2425_1/survey_results_aggregated.arrow",
+    "viz_folder": "data/2425_1/ankets",
+    "prev_surveys_links": "data/prev_links.json",
     "start_time": "'2025-02-11T17:00:00.000Z'",
     "interval_min": 15,
     "working_hours": {
@@ -18,6 +19,7 @@
         "max": 21
     },
     "n_batch": 4,
+    "pers_state_file": "data/2425_1/pers_state.json",
     "col2desc": {
         "Які позитивні риси є у викладача (такі, що можна порекомендувати іншим викладачам)?": "Які позитивні риси є у викладача?",
         "drawbacks_merged": [
