@@ -282,12 +282,12 @@ class TeacherDB:
         """
         group = info["group"]
         for teacher_info in info["teachers"]:
-            teacher_name = teacher_info["name"]
+            teacher_name = teacher_info["name"].translate({"ʼ": "'", "`": "'"})
             total_students = teacher_info["num_students"]
 
             course2audience: dict[str, Audience] = {}
             for course_info in teacher_info["courses"]:
-                course_name = course_info["name"]
+                course_name = course_info["name"].translate({"ʼ": "'", "`": "'"})
                 course2audience[course_name] = Audience(
                     group=Group(group),
                     role=Role.from_str(course_info["role"]),
