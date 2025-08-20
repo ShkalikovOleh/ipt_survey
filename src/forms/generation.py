@@ -71,12 +71,20 @@ def adapt_form_from_template(
 
     roles = teacher.roles
     if len(roles) == 1:
-        insert_loc = get_insert_loc(insert_loc, form, max_loc)
+        insert_loc = (
+            insert_loc
+            if insert_loc
+            else get_first_non_rating_question_loc(insert_loc, form, max_loc)
+        )
         adapt_for_unique_role(
             teacher.overall_role, insert_loc, form, max_loc, section_itemids, requests
         )
     elif len(roles) == 2 and Role.BOTH in roles:
-        insert_loc = get_insert_loc(insert_loc, form, max_loc)
+        insert_loc = (
+            insert_loc
+            if insert_loc
+            else get_first_non_rating_question_loc(insert_loc, form, max_loc)
+        )
         adapt_for_double_role(
             roles,
             insert_loc,
@@ -175,20 +183,16 @@ def adapt_for_unique_role(
         delete_item(redudant_sec_loc, requests)
 
 
-def get_insert_loc(insert_loc: Optional[None], form: dict[str, Any], max_loc: int):
-    if not insert_loc:
-        # find first choice question
-        insert_loc = next(
-            (
-                i
-                for i, item in enumerate(form["items"])
-                if "questionItem" in item
-                and "ratingQuestion" not in item["questionItem"]["question"]
-            ),
-            max_loc,
-        )
-
-    return insert_loc
+def get_first_non_rating_question_loc(form: dict[str, Any], max_loc: int):
+    return next(
+        (
+            i
+            for i, item in enumerate(form["items"])
+            if "questionItem" in item
+            and "ratingQuestion" not in item["questionItem"]["question"]
+        ),
+        max_loc,
+    )
 
 
 def generate_form(
