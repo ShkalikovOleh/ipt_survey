@@ -7,6 +7,8 @@ from googleapiclient.discovery import Resource
 
 from src.teachers_db import Role, Teacher
 
+SUBMIT_FORM = "SUBMIT_FORM"
+
 
 class QuestionType(Enum):
     RATING_QUESTION = 0
@@ -67,60 +69,126 @@ def adapt_form_from_template(
         }
     ]
 
-    section_roles = [Role.PRACTICE, Role.LECTURER, Role.BOTH]
     roles = teacher.roles
     if len(roles) == 1:
-        role = teacher.overall_role
-        if not insert_loc:
-            # find first choice question
-            insert_loc = next(
-                (
-                    i
-                    for i, item in enumerate(form["items"])
-                    if "questionItem" in item
-                    and "choiceQuestion" in item["questionItem"]["question"]
-                ),
-                max_loc,
-            )
-
-        idx_role = section_roles.index(role)
-        start_sec_loc = section_itemids[idx_role][0]
-        end_sec_loc = section_itemids[idx_role + 1][0] if idx_role < 2 else max_loc
-        for loc in range(start_sec_loc + 1, end_sec_loc):
-            move_item(loc, insert_loc, requests)
-            insert_loc += 1
-
-        redudant_sec_loc = section_itemids[0][0] + end_sec_loc - start_sec_loc - 1
-        for i in range(redudant_sec_loc, max_loc):
-            delete_item(
-                redudant_sec_loc, requests
-            )  # bug with location in GoogleFormsAPI (after every delete loc changes)
-    else:
-        options_to_nextid = {
-            str(srole): item_id
-            for srole, (_, item_id) in zip(section_roles, section_itemids)
-            if srole in roles
-        }
-        append_branching_question(
-            "Ким для вас був цей викладач?", options_to_nextid, requests
+        insert_loc = get_insert_loc(insert_loc, form, max_loc)
+        adapt_for_unique_role(
+            teacher.overall_role, insert_loc, form, max_loc, section_itemids, requests
         )
-
-        sections_to_delete = [
-            i for i, srole in enumerate(section_roles) if srole not in roles
-        ]
-        for i in sections_to_delete:
-            start_sec_loc = section_itemids[i][0]
-            end_sec_loc = section_itemids[i + 1][0] if i < 2 else max_loc
-            for _ in range(start_sec_loc, end_sec_loc):
-                delete_item(
-                    start_sec_loc + 1, requests
-                )  # bug with location in GoogleFormsAPI (after every delete loc changes)
+    elif len(roles) == 2 and Role.BOTH in roles:
+        insert_loc = get_insert_loc(insert_loc, form, max_loc)
+        adapt_for_double_role(
+            roles,
+            insert_loc,
+            max_loc,
+            section_itemids,
+            requests,
+        )
+    else:
+        adapt_for_multiple_roles(roles, max_loc, section_itemids, requests)
 
     if stats_granularity:
         append_optional_stats_question(teacher, stats_granularity, requests)
 
     update_form_body(requests, forms_service, form_id, ret_form=False)
     return form_id, form["responderUri"]
+
+
+def adapt_for_multiple_roles(
+    roles: set[Role],
+    max_loc: int,
+    section_itemids: list[tuple[int, str]],
+    requests: list[dict[str, Any]],
+):
+    section_roles = [Role.PRACTICE, Role.LECTURER, Role.BOTH]
+    sections_to_delete = [
+        i for i, srole in enumerate(section_roles) if srole not in roles
+    ]
+    for i in sections_to_delete:
+        start_sec_loc = section_itemids[i][0]
+        end_sec_loc = section_itemids[i + 1][0] if i < 2 else max_loc
+        for _ in range(start_sec_loc, end_sec_loc):
+            delete_item(
+                start_sec_loc, requests
+            )  # bug with location in GoogleFormsAPI (after every delete loc changes)
+
+    options_to_nextid = {
+        str(srole): item_id
+        for srole, (_, item_id) in zip(section_roles, section_itemids)
+        if srole in roles
+    }
+    append_branching_question(
+        "Ким для вас був цей викладач?", options_to_nextid, requests
+    )
+
+
+def adapt_for_double_role(
+    roles: set[Role],
+    insert_loc: int,
+    max_loc: int,
+    section_itemids: list[tuple[int, str]],
+    requests: list[dict[str, Any]],
+):
+    shared_role = roles.difference([Role.BOTH]).pop()
+
+    idx_shared_role = 0 if shared_role == Role.PRACTICE else 1
+    other_role_idx = 1 - idx_shared_role
+
+    start_sec_loc = section_itemids[idx_shared_role][0]
+    end_sec_loc = section_itemids[idx_shared_role + 1][0]
+    for loc in range(start_sec_loc + 1, end_sec_loc):
+        move_item(loc, insert_loc, requests)
+        insert_loc += 1
+
+    redudant_sec_loc = section_itemids[2][0]
+    for _ in range(redudant_sec_loc, max_loc):
+        delete_item(redudant_sec_loc, requests)
+    delete_item(start_sec_loc + end_sec_loc - start_sec_loc - 1, requests)
+
+    options_to_nextid = {
+        str(shared_role): SUBMIT_FORM,
+        str(Role.BOTH): section_itemids[other_role_idx][1],
+    }
+    append_branching_question(
+        "Ким для вас був цей викладач?", options_to_nextid, requests
+    )
+
+
+def adapt_for_unique_role(
+    role: Role,
+    insert_loc: int,
+    max_loc: int,
+    section_itemids: list[tuple[int, str]],
+    requests: list[dict[str, Any]],
+):
+    section_roles = [Role.PRACTICE, Role.LECTURER, Role.BOTH]
+
+    idx_role = section_roles.index(role)
+    start_sec_loc = section_itemids[idx_role][0]
+    end_sec_loc = section_itemids[idx_role + 1][0] if idx_role < 2 else max_loc
+    for loc in range(start_sec_loc + 1, end_sec_loc):
+        move_item(loc, insert_loc, requests)
+        insert_loc += 1
+
+    redudant_sec_loc = section_itemids[0][0] + end_sec_loc - start_sec_loc - 1
+    for _ in range(redudant_sec_loc, max_loc):
+        delete_item(redudant_sec_loc, requests)
+
+
+def get_insert_loc(insert_loc: Optional[None], form: dict[str, Any], max_loc: int):
+    if not insert_loc:
+        # find first choice question
+        insert_loc = next(
+            (
+                i
+                for i, item in enumerate(form["items"])
+                if "questionItem" in item
+                and "ratingQuestion" not in item["questionItem"]["question"]
+            ),
+            max_loc,
+        )
+
+    return insert_loc
 
 
 def generate_form(
@@ -198,10 +266,15 @@ def append_optional_questions(
 def append_branching_question(
     question: str, options_to_nextid: dict[str, str], requests: list[dict[str, Any]]
 ) -> None:
-    options = [
-        {"value": option, "goToSectionId": next_id}
-        for option, next_id in options_to_nextid.items()
-    ]
+    options: list[dict[str, str]] = []
+    for option, next_id in options_to_nextid.items():
+        opt_dict = {"value": option}
+        if next_id != SUBMIT_FORM:
+            opt_dict["goToSectionId"] = next_id
+        else:
+            opt_dict["goToAction"] = SUBMIT_FORM
+        options.append(opt_dict)
+
     requests.append(
         {
             "createItem": {
