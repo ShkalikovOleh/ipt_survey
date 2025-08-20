@@ -22,6 +22,12 @@ fonts_map = {
 }
 color_map = {"background": (19, 20, 2), "text": (255, 255, 255)}
 
+WILLING_CONTINUE_TEACHING_COLUMN = "Чи хочете ви, щоб викладач продовжував викладати?"
+SATISFACTION_COLUMN = (
+    "Наскільки ви в загальному задоволені викладанням дисципліни цим викладачем?"
+)
+SELF_ASSESMENT_COLUMN = "Як ви оціните власні знання з дисципліни?"
+
 template_to_columns = {
     Role.LECTURER: [
         "Ввічливість і загальне враження від спілкування",
@@ -130,9 +136,7 @@ template_to_shift = {
 def generate_vizualization(
     row: pd.Series, teacher: Teacher, photo_dir: str, save_dir: str
 ):
-    per_continue_teaching = int(
-        np.floor(row["Чи хочете ви, щоб викладач продовжував викладати?"] * 100)
-    )
+    per_continue_teaching = int(np.floor(row[WILLING_CONTINUE_TEACHING_COLUMN] * 100))
 
     template = teacher.overall_role
     if template == Role.LECTURER:
@@ -152,10 +156,8 @@ def generate_vizualization(
     spider_plot = convert_matplotlib_fig_to_image(fig_spider)
 
     bar_fig = generate_bar_plot(
-        row[
-            "Наскільки ви в загальному задоволені викладанням дисципліни цим викладачем?"
-        ],
-        row["Як ви оціните власні знання з дисципліни?"],
+        satisfaction_per_grade=row[SATISFACTION_COLUMN],
+        self_assesment_per_grade=row[SELF_ASSESMENT_COLUMN],
     )
     bar_plot = convert_matplotlib_fig_to_image(bar_fig)
 
