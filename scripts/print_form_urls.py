@@ -18,7 +18,7 @@ def print_urls(
 ):
     with open(forms_json, "r", encoding="utf-8") as file:
         forms_info = json.load(file)
-        forms_granularity = forms_info["granularity"]
+        forms_granularity = Granularity(forms_info["granularity"])
         forms_dict: dict[str, list[dict[str, str]]] = forms_info["forms"]
 
     db = load_teachers_db(db_jsons)

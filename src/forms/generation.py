@@ -24,7 +24,7 @@ class Granularity(StrEnum):
 
     def __lt__(self, other):
         if isinstance(other, Granularity):
-            return self._member_names_.index(self.name) > self._member_names_.index(
+            return self._member_names_.index(self.name) < self._member_names_.index(
                 other.name
             )
         raise NotImplementedError

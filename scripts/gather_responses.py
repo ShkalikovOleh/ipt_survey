@@ -47,7 +47,7 @@ def gather_responses(
 
     with open(forms_json, "r", encoding="utf-8") as file:
         forms_info = json.load(file)
-        forms_granularity = forms_info["granularity"]
+        forms_granularity = Granularity(forms_info["granularity"])
         stats_granularity = forms_info.get("stats_granularity")
         forms_dict: dict[str, list[dict[str, str]]] = forms_info["forms"]
 

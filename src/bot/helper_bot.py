@@ -2,6 +2,7 @@ import json
 import math
 from argparse import ArgumentParser, Namespace
 from collections import defaultdict
+from functools import partial
 from typing import Callable, Iterable
 
 from googleapiclient.discovery import Resource
@@ -32,7 +33,7 @@ async def get_group_links(
     context: ContextTypes.DEFAULT_TYPE,
 ):
     teachers_db: TeacherDB = context.bot_data["teachers_db"]
-    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
 
     forms_info = fitler_forms_info_by_granularity(
@@ -42,7 +43,7 @@ async def get_group_links(
         requested_granularity=Granularity.GROUP,
         query=context.args[0],
     )
-    await send_links(update, forms_info)
+    await send_links(update, forms_info, forms_granularity, False)
 
 
 async def get_stream_links(
@@ -50,7 +51,7 @@ async def get_stream_links(
     context: ContextTypes.DEFAULT_TYPE,
 ):
     teachers_db: TeacherDB = context.bot_data["teachers_db"]
-    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
 
     spec, year = context.args[0].split("-")
@@ -61,7 +62,9 @@ async def get_stream_links(
         requested_granularity=Granularity.STREAM,
         query=Stream(Speciality(spec), year),
     )
-    await send_links(update, forms_info)
+    await send_links(
+        update, forms_info, forms_granularity, forms_granularity < Granularity.STREAM
+    )
 
 
 async def get_speciality_links(
@@ -69,7 +72,7 @@ async def get_speciality_links(
     context: ContextTypes.DEFAULT_TYPE,
 ):
     teachers_db: TeacherDB = context.bot_data["teachers_db"]
-    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
 
     forms_info = fitler_forms_info_by_granularity(
@@ -79,7 +82,12 @@ async def get_speciality_links(
         requested_granularity=Granularity.SPECIALITY,
         query=Speciality(context.args[0]),
     )
-    await send_links(update, forms_info)
+    await send_links(
+        update,
+        forms_info,
+        forms_granularity,
+        forms_granularity < Granularity.SPECIALITY,
+    )
 
 
 async def get_all_links(
@@ -87,7 +95,7 @@ async def get_all_links(
     context: ContextTypes.DEFAULT_TYPE,
 ):
     teachers_db: TeacherDB = context.bot_data["teachers_db"]
-    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
 
     forms_info = fitler_forms_info_by_granularity(
@@ -97,13 +105,29 @@ async def get_all_links(
         requested_granularity=Granularity.FACULTY,
         query=None,
     )
-    await send_links(update, forms_info)
+    await send_links(update, forms_info, forms_granularity, True)
 
 
-async def send_links(update: Update, forms_info: Iterable[tuple[str, str]]):
+async def send_links(
+    update: Update,
+    forms_info: Iterable[tuple[str, str]],
+    forms_granulariry: Granularity,
+    print_granularity_info: bool,
+):
+    if print_granularity_info:
+
+        def gran_to_str(form_info: dict[str, str]) -> str:
+            text = form_gran_info_to_str(form_info, forms_granulariry)
+            return text + " "
+
+    else:
+
+        def gran_to_str(_) -> str:
+            return ""
+
     message = "\n".join(
         [
-            f"[{teacher_name}]({form_info['resp_url']})"
+            f"[{gran_to_str(form_info)}{teacher_name}]({form_info['resp_url']})"
             for teacher_name, form_info in forms_info
         ]
     )
@@ -117,7 +141,7 @@ async def get_teacher_links(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
-    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
 
     name = " ".join(context.args)
@@ -126,17 +150,8 @@ async def get_teacher_links(
         if teacher_name == name:
             for form in forms:
                 url = form["resp_url"]
-                match forms_granularity:
-                    case Granularity.GROUP:
-                        messages.append(f"[{form['group']}]({url})")
-                    case Granularity.STREAM:
-                        stream = Stream(Speciality(form["speciality"]), form["year"])
-                        messages.append(f"[{stream}]({url})")
-                    case Granularity.SPECIALITY:
-                        spec = Speciality(form["speciality"])
-                        messages.append(f"[{spec}]({url})")
-                    case Granularity.FACULTY:
-                        messages.append(f"[ФТІ]({url})")
+                text = form_gran_info_to_str(form, forms_granularity)
+                messages.append(f"[{text}]({url})")
 
     if messages:
         await update.message.reply_text("\n".join(messages), parse_mode="Markdown")
@@ -144,11 +159,28 @@ async def get_teacher_links(
         await update.message.reply_text(NO_FORMS_RESPONSE)
 
 
+def form_gran_info_to_str(
+    form_info: dict[str, str],
+    forms_granularity: Granularity,
+) -> str:
+    match forms_granularity:
+        case Granularity.GROUP:
+            return form_info["group"]
+        case Granularity.STREAM:
+            stream = Stream(Speciality(form_info["speciality"]), form_info["year"])
+            return str(stream)
+        case Granularity.SPECIALITY:
+            spec = Speciality(form_info["speciality"])
+            return str(spec)
+        case Granularity.FACULTY:
+            return "ФТІ"
+
+
 async def get_group_stats(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
-    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     teachers_db: TeacherDB = context.bot_data["teachers_db"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
     forms_service: Resource = context.bot_data["forms_service"]
@@ -176,7 +208,7 @@ async def get_speciality_stats(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ):
-    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     teachers_db: TeacherDB = context.bot_data["teachers_db"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
     forms_service: Resource = context.bot_data["forms_service"]
@@ -202,7 +234,7 @@ async def get_speciality_stats(
 
 async def send_stats_for_granularity(
     update: Update,
-    forms_dict: dict[str, list[str, str]],
+    forms_dict: dict[str, list[dict[str, str]]],
     teachers_db: TeacherDB,
     forms_service: Resource,
     query: str | Speciality | Stream,
@@ -241,7 +273,7 @@ def run_bot(
     token: str,
     teachers_db: TeacherDB,
     forms_service: Resource,
-    forms_dict: dict[str, list[str, str]],
+    forms_dict: dict[str, list[dict[str, str]]],
     forms_granularity: Granularity,
 ):
     rate_limiter = AIORateLimiter()
@@ -274,7 +306,7 @@ def run_bot(
 def main(args: Namespace):
     with open(args.forms_json) as file:
         forms_info = json.load(file)
-        forms_granularity = forms_info["granularity"]
+        forms_granularity = Granularity(forms_info["granularity"])
         forms_dict: dict[str, list[dict[str, str]]] = forms_info["forms"]
 
     teachers_db = load_teachers_db(args.teacher_data)
