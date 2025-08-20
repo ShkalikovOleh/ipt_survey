@@ -1,6 +1,7 @@
 import os
 from functools import lru_cache
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -31,9 +32,16 @@ def get_gapi_credentials(cred_file: str, token_store_file: str) -> Credentials:
         creds = Credentials.from_authorized_user_file(token_store_file, SCOPES)
 
     if not creds or not creds.valid:
+        run_flow = False
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                run_flow = True
         else:
+            run_flow = True
+
+        if run_flow:
             flow = InstalledAppFlow.from_client_secrets_file(cred_file, SCOPES)
             creds = flow.run_local_server()
         with open(token_store_file, "w") as token:
