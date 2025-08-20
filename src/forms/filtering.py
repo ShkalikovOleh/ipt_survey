@@ -4,7 +4,7 @@ from src.forms.generation import Granularity
 from src.teachers_db import Group, Speciality, Stream, TeacherDB
 
 
-def get_filter_func(
+def get_granularity_filter_func(
     form_granularity: Granularity,
     requested_granularity: Granularity,
     query: Optional[str | Speciality | Stream],
@@ -95,14 +95,14 @@ def get_filter_func(
     return filter_func
 
 
-def fitler_urls(
+def fitler_forms_info_by_granularity(
     forms_granularity: Granularity,
     requested_granularity: Granularity,
     query: Optional[str | Speciality | Stream],
     forms_dict: dict[str, list[dict[str, str]]],
     db: TeacherDB,
 ):
-    filter_func = get_filter_func(
+    filter_func = get_granularity_filter_func(
         form_granularity=forms_granularity,
         requested_granularity=requested_granularity,
         query=query,
@@ -111,7 +111,7 @@ def fitler_urls(
     for teacher_name, forms in forms_dict.items():
         for form in forms:
             if filter_func(teacher_name, form):
-                yield (teacher_name, form["resp_url"])
+                yield (teacher_name, form)
 
 
 def get_max_student_for_granularity(

@@ -5,7 +5,10 @@ from typing import Optional
 
 from tqdm import tqdm
 
-from src.forms.filtering import get_filter_func, get_max_student_for_granularity
+from src.forms.filtering import (
+    get_granularity_filter_func,
+    get_max_student_for_granularity,
+)
 from src.forms.generation import Granularity
 from src.forms.responses import get_num_responses
 from src.forms.services import get_forms_service, get_gapi_credentials
@@ -36,7 +39,7 @@ def print_stats(
         granularity = Granularity.FACULTY
 
     if granularity:
-        filter_func = get_filter_func(
+        filter_func = get_granularity_filter_func(
             form_granularity=forms_granularity,
             requested_granularity=granularity,
             query=query,

@@ -3,7 +3,7 @@ import json
 from functools import partial
 from typing import Optional
 
-from src.forms.filtering import fitler_urls
+from src.forms.filtering import fitler_forms_info_by_granularity
 from src.forms.generation import Granularity
 from src.teachers_db import Speciality, Stream, load_teachers_db
 from src.utils.cli_helpers import EnumAction, ParseStreamAction
@@ -23,7 +23,7 @@ def print_urls(
 
     db = load_teachers_db(db_jsons)
 
-    for name, url in fitler_urls(
+    for name, form_info in fitler_forms_info_by_granularity(
         forms_granularity=forms_granularity,
         requested_granularity=granularity,
         query=query,
@@ -31,9 +31,9 @@ def print_urls(
         db=db,
     ):
         if format == "markdown":
-            print(f"[{name}]({url})")
+            print(f"[{name}]({form_info['resp_url']})")
         elif format == "simple":
-            print(name, url)
+            print(name, form_info["resp_url"])
 
 
 if __name__ == "__main__":

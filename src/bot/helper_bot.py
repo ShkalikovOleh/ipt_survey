@@ -1,12 +1,13 @@
 import json
 import math
 from argparse import ArgumentParser, Namespace
-from functools import partial
+from collections import defaultdict
 from typing import Callable, Iterable
 
 from googleapiclient.discovery import Resource
 from telegram import Update
 from telegram.ext import (
+    AIORateLimiter,
     Application,
     # filters,
     CommandHandler,
@@ -14,91 +15,111 @@ from telegram.ext import (
 )
 
 from src.forms.filtering import (
-    fitler_urls,
-    get_filter_func,
+    fitler_forms_info_by_granularity,
+    get_granularity_filter_func,
     get_max_student_for_granularity,
 )
 from src.forms.generation import Granularity
-from src.forms.responses import get_num_responses
+from src.forms.responses import get_num_responses, get_responses
 from src.forms.services import get_forms_service, get_gapi_credentials
 from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
+
+NO_FORMS_RESPONSE = "Жодної форми не знайдено"
 
 
 async def get_group_links(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    teachers_db: TeacherDB,
-    forms_dict: dict[str, list[str, str]],
-    forms_granularity: Granularity,
 ):
-    links = fitler_urls(
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+
+    forms_info = fitler_forms_info_by_granularity(
         db=teachers_db,
         forms_dict=forms_dict,
         forms_granularity=forms_granularity,
         requested_granularity=Granularity.GROUP,
         query=context.args[0],
     )
-    await send_links(update, context, links)
+    await send_links(update, forms_info)
 
 
 async def get_stream_links(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    teachers_db: TeacherDB,
-    forms_dict: dict[str, list[str, str]],
-    forms_granularity: Granularity,
 ):
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+
     spec, year = context.args[0].split("-")
-    links = fitler_urls(
+    forms_info = fitler_forms_info_by_granularity(
         db=teachers_db,
         forms_dict=forms_dict,
         forms_granularity=forms_granularity,
         requested_granularity=Granularity.STREAM,
         query=Stream(Speciality(spec), year),
     )
-    await send_links(update, context, links)
+    await send_links(update, forms_info)
 
 
 async def get_speciality_links(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    teachers_db: TeacherDB,
-    forms_dict: dict[str, list[str, str]],
-    forms_granularity: Granularity,
 ):
-    links = fitler_urls(
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+
+    forms_info = fitler_forms_info_by_granularity(
         db=teachers_db,
         forms_dict=forms_dict,
         forms_granularity=forms_granularity,
         requested_granularity=Granularity.SPECIALITY,
         query=Speciality(context.args[0]),
     )
-    await send_links(update, context, links)
+    await send_links(update, forms_info)
 
 
 async def get_all_links(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    teachers_db: TeacherDB,
-    forms_dict: dict[str, list[str, str]],
-    forms_granularity: Granularity,
 ):
-    links = fitler_urls(
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+
+    forms_info = fitler_forms_info_by_granularity(
         db=teachers_db,
         forms_dict=forms_dict,
         forms_granularity=forms_granularity,
         requested_granularity=Granularity.FACULTY,
         query=None,
     )
-    await send_links(update, context, links)
+    await send_links(update, forms_info)
+
+
+async def send_links(update: Update, forms_info: Iterable[tuple[str, str]]):
+    message = "\n".join(
+        [
+            f"[{teacher_name}]({form_info['resp_url']})"
+            for teacher_name, form_info in forms_info
+        ]
+    )
+    if message:
+        await update.message.reply_text(message, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(NO_FORMS_RESPONSE)
 
 
 async def get_teacher_links(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    forms_dict: dict[str, list[str, str]],
-    forms_granularity: Granularity,
 ):
+    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+
     name = " ".join(context.args)
     messages = []
     for teacher_name, forms in forms_dict.items():
@@ -109,33 +130,32 @@ async def get_teacher_links(
                     case Granularity.GROUP:
                         messages.append(f"[{form['group']}]({url})")
                     case Granularity.STREAM:
-                        messages.append(
-                            f"[{form['speciality']}\-{form['year']}]({url})"
-                        )
+                        stream = Stream(Speciality(form["speciality"]), form["year"])
+                        messages.append(f"[{stream}]({url})")
                     case Granularity.SPECIALITY:
-                        messages.append(f"[{form['speciality']}]({url})")
+                        spec = Speciality(form["speciality"])
+                        messages.append(f"[{spec}]({url})")
                     case Granularity.FACULTY:
                         messages.append(f"[ФТІ]({url})")
 
     if messages:
-        await send_message(
-            update, context, "\n".join(messages), parse_mode="MarkdownV2"
-        )
+        await update.message.reply_text("\n".join(messages), parse_mode="Markdown")
     else:
-        await send_message(update, context, "No links for this teacher")
+        await update.message.reply_text(NO_FORMS_RESPONSE)
 
 
 async def get_group_stats(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    forms_dict: dict[str, list[str, str]],
-    teachers_db: TeacherDB,
-    forms_granularity: Granularity,
-    forms_service: Resource,
 ):
+    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+    forms_service: Resource = context.bot_data["forms_service"]
+
     query = context.args[0]
     granularity = Granularity.GROUP
-    filter_func = get_filter_func(
+    filter_func = get_granularity_filter_func(
         form_granularity=forms_granularity,
         requested_granularity=granularity,
         query=query,
@@ -143,7 +163,6 @@ async def get_group_stats(
     )
     await send_stats_for_granularity(
         update,
-        context,
         forms_dict,
         teachers_db,
         forms_service,
@@ -156,14 +175,15 @@ async def get_group_stats(
 async def get_speciality_stats(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    forms_dict: dict[str, list[str, str]],
-    teachers_db: TeacherDB,
-    forms_granularity: Granularity,
-    forms_service: Resource,
 ):
+    forms_dict: dict[str, list[str, str]] = context.bot_data["forms_dict"]
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+    forms_service: Resource = context.bot_data["forms_service"]
+
     query = context.args[0]
     granularity = Granularity.SPECIALITY
-    filter_func = get_filter_func(
+    filter_func = get_granularity_filter_func(
         form_granularity=forms_granularity,
         requested_granularity=granularity,
         query=query,
@@ -171,7 +191,6 @@ async def get_speciality_stats(
     )
     await send_stats_for_granularity(
         update,
-        context,
         forms_dict,
         teachers_db,
         forms_service,
@@ -183,7 +202,6 @@ async def get_speciality_stats(
 
 async def send_stats_for_granularity(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
     forms_dict: dict[str, list[str, str]],
     teachers_db: TeacherDB,
     forms_service: Resource,
@@ -202,6 +220,7 @@ async def send_stats_for_granularity(
         for form in forms:
             if filter_func(teacher_name, form):
                 do_append = True
+                get_responses(form_id=form["form_id"], forms_service=forms_service)
                 num_responses += get_num_responses(
                     form["form_id"], forms_service=forms_service
                 )
@@ -213,87 +232,9 @@ async def send_stats_for_granularity(
             )
 
     if messages:
-        await send_message(update, context, "\n".join(messages))
+        await update.message.reply_text("\n".join(messages))
     else:
-        await send_message(update, context, "No forms for this query")
-
-
-async def send_links(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, links: Iterable[tuple[str, str]]
-):
-    message = "\n".join([f"[{teacher_name}]({link})" for teacher_name, link in links])
-    if message:
-        await send_message(update, context, message, parse_mode="MarkdownV2")
-    else:
-        await send_message(update, context, "No links for this query")
-
-
-async def send_message(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    message: str,
-    parse_mode: str = "html",
-):
-    await context.bot.send_message(
-        chat_id=update.message.chat_id,
-        text=message,
-        reply_to_message_id=update.message.id,
-        parse_mode=parse_mode,
-    )
-
-
-LinkCallable = Callable[
-    [
-        Update,
-        ContextTypes.DEFAULT_TYPE,
-        TeacherDB,
-        dict[str, list[str, str]],
-        Granularity,
-    ],
-    None,
-]
-
-
-def create_links_command(
-    name: str,
-    func: LinkCallable,
-    teachers_db: TeacherDB,
-    forms_dict: dict[str, list[str, str]],
-    forms_granularity: Granularity,
-) -> CommandHandler:
-    callback_func = partial(
-        func,
-        teachers_db=teachers_db,
-        forms_dict=forms_dict,
-        forms_granularity=forms_granularity,
-    )
-    return CommandHandler(
-        name,
-        callback=callback_func,
-        # filters=filters.User(username="ShkalikovOleh"),
-    )
-
-
-def create_stats_command(
-    name: str,
-    func: LinkCallable,
-    teachers_db: TeacherDB,
-    forms_dict: dict[str, list[str, str]],
-    forms_granularity: Granularity,
-    forms_service: Resource,
-) -> CommandHandler:
-    callback_func = partial(
-        func,
-        teachers_db=teachers_db,
-        forms_dict=forms_dict,
-        forms_granularity=forms_granularity,
-        forms_service=forms_service,
-    )
-    return CommandHandler(
-        name,
-        callback=callback_func,
-        # filters=filters.User(username="ShkalikovOleh"),
-    )
+        await update.message.reply_text(NO_FORMS_RESPONSE)
 
 
 def run_bot(
@@ -303,79 +244,29 @@ def run_bot(
     forms_dict: dict[str, list[str, str]],
     forms_granularity: Granularity,
 ):
+    rate_limiter = AIORateLimiter()
     application = (
-        Application.builder().read_timeout(120).write_timeout(120).token(token).build()
+        Application.builder()
+        .read_timeout(30)
+        .rate_limiter(rate_limiter)
+        .token(token)
+        .build()
     )
+    application.bot_data["forms_dict"] = forms_dict
+    application.bot_data["teachers_db"] = teachers_db
+    application.bot_data["forms_granularity"] = forms_granularity
+    application.bot_data["forms_service"] = forms_service
 
     # Links commands
-    application.add_handler(
-        create_links_command(
-            "lgroup",
-            get_group_links,
-            teachers_db=teachers_db,
-            forms_dict=forms_dict,
-            forms_granularity=forms_granularity,
-        )
-    )
-    application.add_handler(
-        create_links_command(
-            "lstream",
-            get_stream_links,
-            teachers_db=teachers_db,
-            forms_dict=forms_dict,
-            forms_granularity=forms_granularity,
-        )
-    )
-    application.add_handler(
-        create_links_command(
-            "lspec",
-            get_speciality_links,
-            teachers_db=teachers_db,
-            forms_dict=forms_dict,
-            forms_granularity=forms_granularity,
-        )
-    )
-    application.add_handler(
-        create_links_command(
-            "lall",
-            get_all_links,
-            teachers_db=teachers_db,
-            forms_dict=forms_dict,
-            forms_granularity=forms_granularity,
-        )
-    )
-    application.add_handler(
-        CommandHandler(
-            "lname",
-            callback=partial(
-                get_teacher_links,
-                forms_dict=forms_dict,
-                forms_granularity=forms_granularity,
-            ),
-        )
-    )
+    application.add_handler(CommandHandler("lgroup", get_group_links))
+    application.add_handler(CommandHandler("lstream", get_stream_links))
+    application.add_handler(CommandHandler("lspec", get_speciality_links))
+    application.add_handler(CommandHandler("lall", get_all_links))
+    application.add_handler(CommandHandler("lname", get_teacher_links))
 
     # Stats commands
-    application.add_handler(
-        create_stats_command(
-            "sgroup",
-            get_group_stats,
-            teachers_db=teachers_db,
-            forms_dict=forms_dict,
-            forms_granularity=forms_granularity,
-            forms_service=forms_service,
-        )
-    )
-    application.add_handler(
-        create_stats_command(
-            "sspec",
-            get_speciality_stats,
-            teachers_db=teachers_db,
-            forms_dict=forms_dict,
-            forms_granularity=forms_granularity,
-            forms_service=forms_service,
-        )
-    )
+    application.add_handler(CommandHandler("sgroup", get_group_stats))
+    application.add_handler(CommandHandler("sspec", get_speciality_stats))
 
     application.run_polling()
 
