@@ -3,7 +3,7 @@ import json
 from functools import partial
 from typing import Optional
 
-from src.forms.filtering import fitler_forms_info_by_granularity
+from src.forms.filtering import fitler_forms_info_by_granularity, form_gran_info_to_str
 from src.forms.generation import Granularity
 from src.teachers_db import Speciality, Stream, load_teachers_db
 from src.utils.cli_helpers import EnumAction, ParseStreamAction
@@ -30,10 +30,13 @@ def print_urls(
         forms_dict=forms_dict,
         db=db,
     ):
+        if forms_granularity < granularity:
+            name = f"{form_gran_info_to_str(form_info, forms_granularity)} {name}"
+
         if format == "markdown":
             print(f"[{name}]({form_info['resp_url']})")
         elif format == "simple":
-            print(name, form_info["resp_url"])
+            print(f"{name} - {form_info['resp_url']}")
 
 
 if __name__ == "__main__":
@@ -53,7 +56,7 @@ if __name__ == "__main__":
         help="Paths to json file with forms info",
     )
     parser.add_argument(
-        "--format", type=str, choices=["markdown", "simple"], default="markdown"
+        "--format", type=str, choices=["markdown", "simple"], default="simple"
     )
 
     granularity_group = parser.add_mutually_exclusive_group(required=True)

@@ -2,7 +2,6 @@ import json
 import math
 from argparse import ArgumentParser, Namespace
 from collections import defaultdict
-from functools import partial
 from typing import Callable, Iterable
 
 from googleapiclient.discovery import Resource
@@ -17,6 +16,7 @@ from telegram.ext import (
 
 from src.forms.filtering import (
     fitler_forms_info_by_granularity,
+    form_gran_info_to_str,
     get_granularity_filter_func,
     get_max_student_for_granularity,
 )
@@ -105,7 +105,9 @@ async def get_all_links(
         requested_granularity=Granularity.FACULTY,
         query=None,
     )
-    await send_links(update, forms_info, forms_granularity, True)
+    await send_links(
+        update, forms_info, forms_granularity, forms_granularity != Granularity.FACULTY
+    )
 
 
 async def send_links(
@@ -157,23 +159,6 @@ async def get_teacher_links(
         await update.message.reply_text("\n".join(messages), parse_mode="Markdown")
     else:
         await update.message.reply_text(NO_FORMS_RESPONSE)
-
-
-def form_gran_info_to_str(
-    form_info: dict[str, str],
-    forms_granularity: Granularity,
-) -> str:
-    match forms_granularity:
-        case Granularity.GROUP:
-            return form_info["group"]
-        case Granularity.STREAM:
-            stream = Stream(Speciality(form_info["speciality"]), form_info["year"])
-            return str(stream)
-        case Granularity.SPECIALITY:
-            spec = Speciality(form_info["speciality"])
-            return str(spec)
-        case Granularity.FACULTY:
-            return "ФТІ"
 
 
 async def get_group_stats(

@@ -132,3 +132,20 @@ def get_max_student_for_granularity(
             max_num_responses = teacher.num_students
 
     return max_num_responses
+
+
+def form_gran_info_to_str(
+    form_info: dict[str, str],
+    forms_granularity: Granularity,
+) -> str:
+    match forms_granularity:
+        case Granularity.GROUP:
+            return form_info["group"]
+        case Granularity.STREAM:
+            stream = Stream(Speciality(form_info["speciality"]), form_info["year"])
+            return str(stream)
+        case Granularity.SPECIALITY:
+            spec = Speciality(form_info["speciality"])
+            return str(spec)
+        case Granularity.FACULTY:
+            return "ФТІ"
