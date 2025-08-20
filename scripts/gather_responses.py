@@ -52,6 +52,7 @@ def gather_responses(
         forms_dict: dict[str, list[dict[str, str]]] = forms_info["forms"]
 
     if stats_granularity:
+        stats_granularity = Granularity(stats_granularity)
         stats_column = get_stats_question(stats_granularity)
         columns_to_parser[stats_column] = parse_str
 
