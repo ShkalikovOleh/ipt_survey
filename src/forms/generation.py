@@ -74,16 +74,16 @@ def adapt_form_from_template(
         insert_loc = (
             insert_loc
             if insert_loc
-            else get_first_non_rating_question_loc(insert_loc, form, max_loc)
+            else get_first_non_rating_question_loc(form, max_loc)
         )
         adapt_for_unique_role(
-            teacher.overall_role, insert_loc, form, max_loc, section_itemids, requests
+            teacher.overall_role, insert_loc, max_loc, section_itemids, requests
         )
     elif len(roles) == 2 and Role.BOTH in roles:
         insert_loc = (
             insert_loc
             if insert_loc
-            else get_first_non_rating_question_loc(insert_loc, form, max_loc)
+            else get_first_non_rating_question_loc(form, max_loc)
         )
         adapt_for_double_role(
             roles,
@@ -322,9 +322,9 @@ def append_optional_stats_question(
             return
 
     if len(options) < 2:
-        print(teacher.name, options)
         return
 
+    options = sorted(options, key=lambda item: item["value"])
     requests.append(
         {
             "createItem": {
