@@ -13,7 +13,7 @@ from src.forms.filtering import (
 from src.forms.generation import Granularity
 from src.forms.responses import get_num_responses
 from src.forms.services import get_forms_service, get_gapi_credentials
-from src.teachers_db import Speciality, Stream, load_teachers_db
+from src.teachers_db import Group, Speciality, Stream, load_teachers_db
 from src.utils.cli_helpers import EnumAction, ParseStreamAction
 
 
@@ -23,7 +23,7 @@ def print_stats(
     secrets_file: str,
     token_file: str,
     granularity: Optional[Granularity],
-    query: Optional[str | Speciality | Stream],
+    query: Optional[Group | Speciality | Stream],
     print_all: bool = False,
 ):
     creds = get_gapi_credentials(cred_file=secrets_file, token_store_file=token_file)
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     if args.group:
         print_func(
             granularity=Granularity.GROUP,
-            query=args.group,
+            query=Group(args.group),
         )
     elif args.stream:
         print_func(

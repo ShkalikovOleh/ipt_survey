@@ -7,38 +7,33 @@ from src.teachers_db import Group, Speciality, Stream, TeacherDB
 def get_granularity_filter_func(
     form_granularity: Granularity,
     requested_granularity: Granularity,
-    query: Optional[str | Speciality | Stream],
+    query: Optional[Group | Speciality | Stream],
     db: TeacherDB,
 ):
     match (requested_granularity, form_granularity):
         case (Granularity.GROUP, Granularity.GROUP):
 
             def filter_func(teacher_name, form_info):
-                return form_info["group"] == query
+                return form_info["group"] == query.name
 
         case (Granularity.GROUP, Granularity.STREAM):
 
             def filter_func(teacher_name, form_info):
-                req_group = Group(query)
                 stream = Stream(Speciality(form_info["speciality"]), form_info["year"])
-                return (
-                    req_group.stream == stream and req_group in db[teacher_name].groups
-                )
+                return query.stream == stream and query in db[teacher_name].groups
 
         case (Granularity.GROUP, Granularity.SPECIALITY):
 
             def filter_func(teacher_name, form_info):
-                req_group = Group(query)
                 return (
-                    Speciality(form_info["speciality"]) == req_group.speciality
-                    and req_group in db[teacher_name].groups
+                    Speciality(form_info["speciality"]) == query.speciality
+                    and query in db[teacher_name].groups
                 )
 
         case (Granularity.GROUP, Granularity.FACULTY):
 
             def filter_func(teacher_name, form_info):
-                req_group = Group(query)
-                return req_group in db[teacher_name].groups
+                return query in db[teacher_name].groups
 
         case (Granularity.STREAM, Granularity.GROUP):
 
@@ -98,7 +93,7 @@ def get_granularity_filter_func(
 def fitler_forms_info_by_granularity(
     forms_granularity: Granularity,
     requested_granularity: Granularity,
-    query: Optional[str | Speciality | Stream],
+    query: Optional[Group | Speciality | Stream],
     forms_dict: dict[str, list[dict[str, str]]],
     db: TeacherDB,
 ):
@@ -116,7 +111,7 @@ def fitler_forms_info_by_granularity(
 
 def get_max_student_for_granularity(
     granularity: Granularity,
-    query: Optional[str | Speciality | Stream],
+    query: Optional[str | Group | Speciality | Stream],
     db: TeacherDB,
     teacher_name: str,
 ):

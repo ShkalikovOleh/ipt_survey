@@ -52,8 +52,7 @@ _str_to_op = {v: k for k, v in _op_to_str.items()}
 _op_to_spec_code = {
     Speciality.APPLIED_MATH: "ФІ",
     Speciality.APPLIED_PHYSICS: "ФФ",
-    Speciality.CYBERSECURITY: "ФБ",
-    Speciality.CYBERSECURITY: "ФE",
+    Speciality.CYBERSECURITY: "ФБE",
 }
 _spec_code_to_spec = {v: k for k, v in _op_to_str.items()}
 
@@ -94,6 +93,9 @@ class Group:
     @property
     def stream(self) -> Stream:
         return Stream(self.speciality, self.enrollment_year)
+
+    def __str__(self):
+        return self.name
 
 
 @dataclass(eq=True, frozen=True, slots=True)

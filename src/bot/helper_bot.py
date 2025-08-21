@@ -1,4 +1,3 @@
-from itertools import batched
 import json
 import math
 from argparse import ArgumentParser, Namespace
@@ -25,9 +24,18 @@ from src.forms.filtering import (
 from src.forms.generation import Granularity
 from src.forms.responses import get_num_responses
 from src.forms.services import get_forms_service, get_gapi_credentials
-from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
+from src.teachers_db import (
+    Group,
+    Speciality,
+    Stream,
+    Teacher,
+    TeacherDB,
+    load_teachers_db,
+)
 
 NO_FORMS_RESPONSE = "Жодної форми не знайдено"
+MIN_NUM_RESPONSE_TO_PUBLISH = 5
+MIN_FRACTION_TO_PUBLISH = 0.2
 
 
 async def get_group_links(
@@ -183,7 +191,7 @@ async def get_group_stats(
     stats_granularity: Optional[Granularity] = context.bot_data["stats_granularity"]
     forms_service: Resource = context.bot_data["forms_service"]
 
-    query = context.args[0]
+    query = Group(context.args[0])
     granularity = Granularity.GROUP
     filter_func = get_granularity_filter_func(
         form_granularity=forms_granularity,
@@ -337,7 +345,7 @@ async def send_stats_for_granularity(
     forms_dict: dict[str, list[dict[str, str]]],
     teachers_db: TeacherDB,
     forms_service: Resource,
-    query: Optional[str | Speciality | Stream],
+    query: Optional[Group | Speciality | Stream],
     req_granularity: Optional[Granularity],
     forms_granularity: Granularity,
     stats_granularity: Optional[Granularity],
@@ -397,7 +405,7 @@ async def send_stats_for_granularity(
                     percent = math.floor(num_responses / max_num_responses * 100)
                     emoji = get_satisfy_emoji(num_responses, percent)
                     messages.append(
-                        f"{emoji}{teacher_name} - {num_responses} - {percent}%"
+                        f"{emoji}{teacher_name} - {num_responses}/{max_num_responses} - {percent}%"
                     )
                 else:
                     messages.append(f"{teacher_name} - {num_responses}")
@@ -422,11 +430,11 @@ async def send_stats_for_granularity(
 
 
 def get_satisfy_emoji(num_responses: int, percent: int):
-    if num_responses < 5:
+    if num_responses < MIN_NUM_RESPONSE_TO_PUBLISH:
         emoji = "⛔️"
-    elif percent >= 20:
+    elif percent >= MIN_FRACTION_TO_PUBLISH * 10:
         emoji = "✅"
-    elif percent >= 15:
+    elif percent >= (MIN_FRACTION_TO_PUBLISH - 0.05) * 10:
         emoji = "⚠️"
     else:
         emoji = "⛔️"
@@ -462,19 +470,268 @@ def add_optional_stats_info(
         messages.append("\n".join(stats_messages))
 
 
+async def get_group_need(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+    stats_granularity: Optional[Granularity] = context.bot_data["stats_granularity"]
+    forms_service: Resource = context.bot_data["forms_service"]
+
+    group = Group(context.args[0])
+
+    def filter_func(teacher: Teacher) -> bool:
+        return group in teacher.groups
+
+    await sent_need_for_granularity(
+        update=update,
+        context=context,
+        forms_dict=forms_dict,
+        teachers_db=teachers_db,
+        forms_service=forms_service,
+        forms_granularity=forms_granularity,
+        stats_granularity=stats_granularity,
+        requested_granularity=Granularity.GROUP,
+        query=group,
+        teacher_filter_func=filter_func,
+    )
+
+
+async def get_stream_need(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+    stats_granularity: Optional[Granularity] = context.bot_data["stats_granularity"]
+    forms_service: Resource = context.bot_data["forms_service"]
+
+    spec, year = context.args[0].split("-")
+    stream = Stream(Speciality(spec), year)
+
+    def filter_func(teacher: Teacher) -> bool:
+        return stream in teacher.streams
+
+    await sent_need_for_granularity(
+        update=update,
+        context=context,
+        forms_dict=forms_dict,
+        teachers_db=teachers_db,
+        forms_service=forms_service,
+        forms_granularity=forms_granularity,
+        stats_granularity=stats_granularity,
+        requested_granularity=Granularity.STREAM,
+        query=stream,
+        teacher_filter_func=filter_func,
+    )
+
+
+async def get_spec_need(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+    stats_granularity: Optional[Granularity] = context.bot_data["stats_granularity"]
+    forms_service: Resource = context.bot_data["forms_service"]
+
+    spec = Speciality(context.args[0])
+
+    def filter_func(teacher: Teacher) -> bool:
+        return spec in teacher.specialities
+
+    await sent_need_for_granularity(
+        update=update,
+        context=context,
+        forms_dict=forms_dict,
+        teachers_db=teachers_db,
+        forms_service=forms_service,
+        forms_granularity=forms_granularity,
+        stats_granularity=stats_granularity,
+        requested_granularity=Granularity.SPECIALITY,
+        query=spec,
+        teacher_filter_func=filter_func,
+    )
+
+
+async def get_all_need(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
+    teachers_db: TeacherDB = context.bot_data["teachers_db"]
+    forms_granularity: Granularity = context.bot_data["forms_granularity"]
+    stats_granularity: Optional[Granularity] = context.bot_data["stats_granularity"]
+    forms_service: Resource = context.bot_data["forms_service"]
+
+    def filter_func(teacher: Teacher) -> bool:
+        return True
+
+    await sent_need_for_granularity(
+        update=update,
+        context=context,
+        forms_dict=forms_dict,
+        teachers_db=teachers_db,
+        forms_service=forms_service,
+        forms_granularity=forms_granularity,
+        stats_granularity=stats_granularity,
+        requested_granularity=Granularity.FACULTY,
+        query=None,
+        teacher_filter_func=filter_func,
+    )
+
+
+async def sent_need_for_granularity(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    forms_dict: dict[str, list[dict[str, str]]],
+    teachers_db: TeacherDB,
+    teacher_filter_func: Callable[[Teacher], bool],
+    forms_service: Resource,
+    forms_granularity: Granularity,
+    stats_granularity: Optional[Granularity],
+    requested_granularity: Granularity,
+    query: Optional[Group | Stream | Speciality],
+):
+    need_messages = []
+    form_gran_filter_func = get_granularity_filter_func(
+        forms_granularity, requested_granularity, query, teachers_db
+    )
+
+    for teacher_name, forms in forms_dict.items():
+        teacher = teachers_db[teacher_name]
+        if teacher_filter_func(teacher):
+            eff_stats_queries = requested_query_to_stats_queries(
+                stats_granularity, requested_granularity, query, teacher
+            )
+
+            max_num_responses = get_max_student_for_granularity(
+                Granularity.FACULTY, None, teachers_db, teacher_name
+            )
+            max_query_related_responses = 0
+
+            total_responses = 0
+            query_related_tesponses = 0
+            num_per_stats_entity: dict[str, int] = defaultdict(int)
+            for form_info in forms:
+                total_num_resp, stats_resp = get_num_responses(
+                    form_info["form_id"],
+                    forms_service=forms_service,
+                    stats_granularity=stats_granularity,
+                )
+
+                total_responses += total_num_resp
+                for k, v in stats_resp.items():
+                    num_per_stats_entity[k] += v
+
+                if (
+                    requested_granularity < Granularity.FACULTY
+                    and form_gran_filter_func(teacher_name, form_info)
+                ):
+                    form_query = form_info_to_query(form_info, forms_granularity)
+                    query_related_tesponses += total_num_resp
+                    max_query_related_responses += get_max_student_for_granularity(
+                        forms_granularity, form_query, teachers_db, teacher_name
+                    )
+
+            # Check overall
+            if (
+                total_responses > MIN_NUM_RESPONSE_TO_PUBLISH
+                and total_responses / max_num_responses >= MIN_FRACTION_TO_PUBLISH
+            ):
+                continue
+
+            if requested_granularity < Granularity.FACULTY:
+                # Check based on form granurality
+                if max_query_related_responses == query_related_tesponses:
+                    continue
+
+            max_stud_stats_grans = []
+            num_stats_gran_resps = []
+            # Check optional stats question results
+            if (
+                stats_granularity < forms_granularity
+                and requested_granularity < Granularity.FACULTY
+            ):
+                for eff_query in eff_stats_queries:
+                    query_str = str(eff_query)
+                    if query_str in num_per_stats_entity:
+                        max_stud_stats_gran = get_max_student_for_granularity(
+                            stats_granularity, eff_query, teachers_db, teacher_name
+                        )
+                        max_stud_stats_grans.append(max_stud_stats_gran)
+                        num_stats_gran_resps.append(num_per_stats_entity[query_str])
+
+                if (
+                    num_stats_gran_resps
+                    and num_stats_gran_resps == max_stud_stats_grans
+                ):
+                    continue
+
+            # Mark as needed more votes
+            num_need = max(5, math.floor(MIN_FRACTION_TO_PUBLISH * max_num_responses))
+            emoji = get_satisfy_emoji(
+                total_responses, total_responses / max_num_responses * 100
+            )
+            need_messages.append(
+                f"{emoji}{teacher_name} - {total_responses}/{max_num_responses} - ще треба {num_need} загалом"
+            )
+            if requested_granularity < Granularity.FACULTY:
+                need_messages.append(
+                    f"Серед релевантних до запиту форм: {query_related_tesponses}/{max_query_related_responses}"
+                )
+            for eff_query, curr_num, max_num in zip(
+                eff_stats_queries, num_stats_gran_resps, max_stud_stats_grans
+            ):
+                need_messages.append(f"{eff_query} - {curr_num}/{max_num}")
+            need_messages.append("---------")
+
+    if need_messages:
+        await reply_text(update, context, "\n".join(need_messages))
+    else:
+        await reply_text(update, context, "Усі викладачі набрали достатньо відповідей!")
+
+
+def requested_query_to_stats_queries(
+    stats_granularity: Granularity,
+    requested_granularity: Granularity,
+    query: Optional[Group | Stream | Speciality],
+    teacher: Teacher,
+) -> list[Group | Stream | Speciality]:
+    match (requested_granularity, stats_granularity):
+        case (Granularity.GROUP, Granularity.STREAM):
+            eff_stats_queries = [query.stream]
+        case (Granularity.GROUP, Granularity.SPECIALITY):
+            eff_stats_queries = [query.speciality]
+        case (Granularity.STREAM, Granularity.GROUP):
+            eff_stats_queries = [g for g in teacher.groups if g.stream == query]
+        case (Granularity.STREAM, Granularity.SPECIALITY):
+            eff_stats_queries = [query.speciality]
+        case (Granularity.SPECIALITY, Granularity.GROUP):
+            eff_stats_queries = [g for g in teacher.groups if g.speciality == query]
+        case (Granularity.SPECIALITY, Granularity.STREAM):
+            eff_stats_queries = [s for s in teacher.streams if s.speciality == query]
+        case _:
+            eff_stats_queries = [query]
+    return eff_stats_queries
+
+
 async def reply_text(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     message: str,
     parse_mode: Optional[str] = None,
 ):
-    for msg_batch in batched(message, 4096):
-        await context.bot.send_message(
-            chat_id=update.message.chat_id,
-            text=msg_batch,
-            reply_to_message_id=update.message.id,
-            parse_mode=parse_mode,
-        )
+    await context.bot.send_message(
+        chat_id=update.message.chat_id,
+        text=message,
+        reply_to_message_id=update.message.id,
+        parse_mode=parse_mode,
+    )
 
 
 def run_bot(
@@ -512,6 +769,12 @@ def run_bot(
     application.add_handler(CommandHandler("sspec", get_speciality_stats))
     application.add_handler(CommandHandler("sname", get_teacher_stats))
     application.add_handler(CommandHandler("sall", get_all_stats))
+
+    # Need more votes
+    application.add_handler(CommandHandler("ngroup", get_group_need))
+    application.add_handler(CommandHandler("nstream", get_stream_need))
+    application.add_handler(CommandHandler("nspec", get_spec_need))
+    application.add_handler(CommandHandler("nall", get_all_need))
 
     application.run_polling()
 

@@ -5,7 +5,7 @@ from typing import Optional
 
 from src.forms.filtering import fitler_forms_info_by_granularity, form_gran_info_to_str
 from src.forms.generation import Granularity
-from src.teachers_db import Speciality, Stream, load_teachers_db
+from src.teachers_db import Group, Speciality, Stream, load_teachers_db
 from src.utils.cli_helpers import EnumAction, ParseStreamAction
 
 
@@ -14,7 +14,7 @@ def print_urls(
     forms_json: str,
     format: str,
     granularity: Granularity,
-    query: Optional[str | Speciality | Stream],
+    query: Optional[Group | Speciality | Stream],
 ):
     with open(forms_json, "r", encoding="utf-8") as file:
         forms_info = json.load(file)
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     if args.group:
         print_urls_func(
             granularity=Granularity.GROUP,
-            query=args.group,
+            query=Group(args.group),
         )
     elif args.stream:
         print_urls_func(
