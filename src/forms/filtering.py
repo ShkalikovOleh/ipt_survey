@@ -134,6 +134,21 @@ def get_max_student_for_granularity(
     return max_num_responses
 
 
+def form_info_to_query(
+    form_info: dict[str, str],
+    forms_granularity: Granularity,
+) -> Optional[str | Speciality | Stream]:
+    match forms_granularity:
+        case Granularity.GROUP:
+            return form_info["group"]
+        case Granularity.STREAM:
+            return Stream(Speciality(form_info["speciality"]), form_info["year"])
+        case Granularity.SPECIALITY:
+            return Speciality(form_info["speciality"])
+        case Granularity.FACULTY:
+            return None
+
+
 def form_gran_info_to_str(
     form_info: dict[str, str],
     forms_granularity: Granularity,

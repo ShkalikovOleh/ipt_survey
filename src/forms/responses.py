@@ -1,10 +1,11 @@
+from collections import defaultdict
 from collections.abc import Callable
 from typing import Any, Optional
 
 import pandas as pd
 from googleapiclient.discovery import Resource
 
-from src.forms.generation import get_form
+from src.forms.generation import Granularity, get_form, get_stats_question
 
 
 def get_responses(form_id: str, forms_service: Resource) -> list[dict[str, Any]]:
@@ -15,8 +16,29 @@ def get_responses(form_id: str, forms_service: Resource) -> list[dict[str, Any]]
         return []
 
 
-def get_num_responses(form_id: str, forms_service: Resource) -> int:
-    return len(get_responses(form_id, forms_service))
+def get_num_responses(
+    form_id: str,
+    forms_service: Resource,
+    stats_granularity: Optional[Granularity] = None,
+) -> tuple[int, dict[str, int]]:
+    responses = get_responses(form_id, forms_service)
+
+    total_num_resp = len(responses)
+    num_gran_resp = defaultdict(lambda: 0)
+
+    if stats_granularity:
+        stats_question = get_stats_question(stats_granularity)
+        id2q = build_id_to_question_map(form_id, forms_service)
+        for response in responses:
+            key = "Anonymous"
+            for qId, answer_item in response["answers"].items():
+                question = id2q[qId]
+                if question == stats_question:
+                    key = answer_item["textAnswers"]["answers"][0]["value"]
+
+            num_gran_resp[key] += 1
+
+    return total_num_resp, num_gran_resp
 
 
 def build_id_to_question_map(form_id: str, forms_service: Resource) -> dict[str, str]:

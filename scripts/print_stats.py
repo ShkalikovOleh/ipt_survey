@@ -6,13 +6,14 @@ from typing import Optional
 from tqdm import tqdm
 
 from src.forms.filtering import (
+    form_info_to_query,
     get_granularity_filter_func,
     get_max_student_for_granularity,
 )
 from src.forms.generation import Granularity
 from src.forms.responses import get_num_responses
 from src.forms.services import get_forms_service, get_gapi_credentials
-from src.teachers_db import Speciality, Stream, TeacherDB, load_teachers_db
+from src.teachers_db import Speciality, Stream, load_teachers_db
 from src.utils.cli_helpers import EnumAction, ParseStreamAction
 
 
@@ -56,21 +57,30 @@ def print_stats(
             for form in forms:
                 if filter_func(teacher_name, form):
                     do_print = True
-                    num_responses += get_num_responses(
+                    form_responses, _ = get_num_responses(
                         form["form_id"], forms_service=forms_service
                     )
+                    num_responses += form_responses
         elif teacher_name == query:
             do_print = True
             max_num_responses = db[teacher_name].num_students
             for form in forms:
-                form_responses = get_num_responses(
+                form_responses, _ = get_num_responses(
                     form["form_id"], forms_service=forms_service
                 )
                 num_responses += form_responses
 
-                print_per_form_stats(
-                    forms_granularity, db, teacher_name, form, form_responses
-                )
+                if forms_granularity < Granularity.FACULTY:
+                    query = form_info_to_query(form, forms_granularity)
+                    max_form_resp = get_max_student_for_granularity(
+                        forms_granularity, query, db, teacher_name
+                    )
+                    print(
+                        teacher_name,
+                        str(query),
+                        f"{form_responses}/{max_form_resp}",
+                        form_responses / max_form_resp,
+                    )
 
         if do_print:
             print(
@@ -80,52 +90,6 @@ def print_stats(
             )
             if not print_all:
                 break
-
-
-def print_per_form_stats(
-    forms_granularity: Granularity,
-    db: TeacherDB,
-    teacher_name: str,
-    form: dict[str, str],
-    form_responses: int,
-):
-    match forms_granularity:
-        case Granularity.GROUP:
-            max_form_resp = get_max_student_for_granularity(
-                forms_granularity, form["group"], db, teacher_name
-            )
-            print(
-                teacher_name,
-                form["group"],
-                f"{form_responses}/{max_form_resp}",
-                form_responses / max_form_resp,
-            )
-        case Granularity.STREAM:
-            max_form_resp = get_max_student_for_granularity(
-                forms_granularity,
-                Stream(Speciality(form["speciality"]), form["year"]),
-                db,
-                teacher_name,
-            )
-            print(
-                teacher_name,
-                f"{form['speciality']}-{form['year']}",
-                f"{form_responses}/{max_form_resp}",
-                form_responses / max_form_resp,
-            )
-        case Granularity.SPECIALITY:
-            max_form_resp = get_max_student_for_granularity(
-                forms_granularity,
-                Speciality(form["speciality"]),
-                db,
-                teacher_name,
-            )
-            print(
-                teacher_name,
-                form["speciality"],
-                f"{form_responses}/{max_form_resp}",
-                form_responses / max_form_resp,
-            )
 
 
 if __name__ == "__main__":
