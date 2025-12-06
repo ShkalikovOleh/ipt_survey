@@ -82,7 +82,7 @@ class Group:
             "ФІ": Speciality.APPLIED_MATH,
             "ФФ": Speciality.APPLIED_PHYSICS,
             "ФБ": Speciality.CYBERSECURITY,
-            "ФE": Speciality.CYBERSECURITY,
+            "ФЕ": Speciality.CYBERSECURITY,
         }
         return letter_to_op[self.name[:2]]
 
