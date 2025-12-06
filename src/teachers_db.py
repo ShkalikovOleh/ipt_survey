@@ -264,7 +264,10 @@ class TeacherDB:
     def __init__(self):
         self.db: dict[str, Teacher] = {}
 
-    def append_from_group_dict(self, info: dict) -> None:
+    def append_from_group_dict(
+        self,
+        info: dict[str, str | list[dict[str, str | int | list[dict[str, str | bool]]]]],
+    ) -> None:
         """
         The expected structure of the dict:
         {
@@ -373,6 +376,10 @@ def load_teachers_db(json_files: list[str]) -> TeacherDB:
     for path in json_files:
         with open(path) as file:
             info = json.load(file)
-            teacher_db.append_from_group_dict(info)
+            if isinstance(info, dict):
+                info = [info]
+
+            for item in info:
+                teacher_db.append_from_group_dict(item)
 
     return teacher_db
