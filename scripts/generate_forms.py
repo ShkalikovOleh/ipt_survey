@@ -98,6 +98,9 @@ def generate_forms(
             )
             publish_form(form_id=form_id, forms_service=forms_service)
             give_access_to_organization(form_id=form_id, drive_service=drive_serive)
+            give_access_to_organization(
+                form_id=form_id, drive_service=drive_serive, domain="edu.kpi.ua"
+            )
 
             form_info = meta_func(option)
             form_info["form_id"] = form_id
