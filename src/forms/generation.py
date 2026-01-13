@@ -77,11 +77,14 @@ def adapt_form_from_template(
             stats_quest_loc = max_loc
         else:
             stats_quest_loc = section_itemids[0][0]
+
         is_appended = append_optional_stats_question(
             teacher, stats_granularity, requests, stats_quest_loc
         )
-        section_itemids = [(idx + is_appended, id) for (idx, id) in section_itemids]
-        max_loc += is_appended
+
+        if is_appended and len(roles) > 1:
+            max_loc += 1
+            section_itemids = [(idx + 1, id) for (idx, id) in section_itemids]
 
     if len(roles) == 1:
         insert_loc = (
