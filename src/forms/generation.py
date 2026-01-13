@@ -70,6 +70,17 @@ def adapt_form_from_template(
     ]
 
     roles = teacher.roles
+
+    if stats_granularity:
+        if len(roles) == 1:
+            stats_quest_loc = max_loc
+        else:
+            stats_quest_loc = section_itemids[0][0]
+            section_itemids = [(idx + 1, id) for (idx, id) in section_itemids]
+        append_optional_stats_question(
+            teacher, stats_granularity, requests, stats_quest_loc
+        )
+
     if len(roles) == 1:
         insert_loc = (
             insert_loc
@@ -94,9 +105,6 @@ def adapt_form_from_template(
         )
     else:
         adapt_for_multiple_roles(roles, max_loc, section_itemids, requests)
-
-    if stats_granularity:
-        append_optional_stats_question(teacher, stats_granularity, requests)
 
     update_form_body(requests, forms_service, form_id, ret_form=False)
     return form_id, form["responderUri"]
@@ -304,12 +312,15 @@ def get_stats_question(stats_granularity: Granularity):
         case Granularity.SPECIALITY:
             stats_column = "Оберіть вашу спеціальність"
         case Granularity.STREAM:
-            stats_column = "Оберіть ваш поток"
+            stats_column = "Оберіть ваш потік"
     return stats_column
 
 
 def append_optional_stats_question(
-    teacher: Teacher, granularity: Granularity, requests: list[dict[str, Any]]
+    teacher: Teacher,
+    granularity: Granularity,
+    requests: list[dict[str, Any]],
+    insert_loc: int = 0,
 ) -> None:
     match granularity:
         case Granularity.GROUP:
@@ -339,7 +350,7 @@ def append_optional_stats_question(
                         },
                     },
                 },
-                "location": {"index": 0},
+                "location": {"index": insert_loc},
             }
         }
     )
