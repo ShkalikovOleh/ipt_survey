@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum, StrEnum
-from functools import total_ordering
+from functools import total_ordering, wraps
+import random
+import time
 from typing import Any, Optional
 
 from googleapiclient.discovery import Resource
+from googleapiclient.errors import HttpError
 
 from src.teachers_db import Role, Teacher
 
@@ -80,6 +83,7 @@ def adapt_form_from_template(
         append_optional_stats_question(
             teacher, stats_granularity, requests, stats_quest_loc
         )
+        max_loc += 1
 
     if len(roles) == 1:
         insert_loc = (
@@ -431,10 +435,47 @@ def delete_item(loc: int, requests: list[dict[str, Any]]) -> None:
     )
 
 
+def retry_google_api(
+    *,
+    retries: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 30.0,
+    retry_statuses: tuple[int, ...] = (429, 500, 503),
+):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except HttpError as e:
+                    status = getattr(e.resp, "status", None)
+
+                    if status not in retry_statuses:
+                        raise
+
+                    if attempt == retries - 1:
+                        raise
+
+                    delay = min(
+                        max_delay,
+                        base_delay * (2**attempt),
+                    )
+                    delay *= random.uniform(0.5, 1.5)
+
+                    time.sleep(delay)
+
+        return wrapper
+
+    return decorator
+
+
+@retry_google_api()
 def get_form(forms_service, form_id):
     return forms_service.forms().get(formId=form_id).execute()
 
 
+@retry_google_api()
 def update_form_body(
     requests: list[dict[str, Any]],
     forms_service: Resource,
@@ -448,6 +489,7 @@ def update_form_body(
     return form_upd_res
 
 
+@retry_google_api()
 def copy_form(
     teacher_name: str, drive_service: Resource, template_id: str, dest_folder_id: str
 ) -> str:
