@@ -1,13 +1,11 @@
 from dataclasses import dataclass
 from enum import Enum, StrEnum
-from functools import total_ordering, wraps
-import random
-import time
+from functools import total_ordering
 from typing import Any, Optional
 
 from googleapiclient.discovery import Resource
-from googleapiclient.errors import HttpError
 
+from src.forms.services import retry_google_api
 from src.teachers_db import Role, Teacher
 
 SUBMIT_FORM = "SUBMIT_FORM"
@@ -79,10 +77,10 @@ def adapt_form_from_template(
             stats_quest_loc = max_loc
         else:
             stats_quest_loc = section_itemids[0][0]
-            section_itemids = [(idx + 1, id) for (idx, id) in section_itemids]
         is_appended = append_optional_stats_question(
             teacher, stats_granularity, requests, stats_quest_loc
         )
+        section_itemids = [(idx + is_appended, id) for (idx, id) in section_itemids]
         max_loc += is_appended
 
     if len(roles) == 1:
@@ -435,41 +433,6 @@ def delete_item(loc: int, requests: list[dict[str, Any]]) -> None:
             }
         }
     )
-
-
-def retry_google_api(
-    *,
-    retries: int = 5,
-    base_delay: float = 1.0,
-    max_delay: float = 30.0,
-    retry_statuses: tuple[int, ...] = (429, 500, 503),
-):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except HttpError as e:
-                    status = getattr(e.resp, "status", None)
-
-                    if status not in retry_statuses:
-                        raise
-
-                    if attempt == retries - 1:
-                        raise
-
-                    delay = min(
-                        max_delay,
-                        base_delay * (2**attempt),
-                    )
-                    delay *= random.uniform(0.5, 1.5)
-
-                    time.sleep(delay)
-
-        return wrapper
-
-    return decorator
 
 
 @retry_google_api()

@@ -1,11 +1,14 @@
 import os
-from functools import lru_cache
+from functools import lru_cache, wraps
+import random
+import time
 
 from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import Resource, build
+from googleapiclient.errors import HttpError
 
 
 @lru_cache(maxsize=1)
@@ -48,3 +51,38 @@ def get_gapi_credentials(cred_file: str, token_store_file: str) -> Credentials:
             token.write(creds.to_json())
 
     return creds
+
+
+def retry_google_api(
+    *,
+    retries: int = 5,
+    base_delay: float = 1.0,
+    max_delay: float = 30.0,
+    retry_statuses: tuple[int, ...] = (429, 500, 503),
+):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except HttpError as e:
+                    status = getattr(e.resp, "status", None)
+
+                    if status not in retry_statuses:
+                        raise
+
+                    if attempt == retries - 1:
+                        raise
+
+                    delay = min(
+                        max_delay,
+                        base_delay * (2**attempt),
+                    )
+                    delay *= random.uniform(0.5, 1.5)
+
+                    time.sleep(delay)
+
+        return wrapper
+
+    return decorator

@@ -6,8 +6,10 @@ import pandas as pd
 from googleapiclient.discovery import Resource
 
 from src.forms.generation import Granularity, get_form, get_stats_question
+from src.forms.services import retry_google_api
 
 
+@retry_google_api()
 def get_responses(form_id: str, forms_service: Resource) -> list[dict[str, Any]]:
     responses = forms_service.forms().responses().list(formId=form_id).execute()  # type: ignore
     if "responses" in responses:

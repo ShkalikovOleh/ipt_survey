@@ -1,6 +1,9 @@
 from googleapiclient.discovery import Resource
 
+from src.forms.services import retry_google_api
 
+
+@retry_google_api()
 def __change_publish_settings(
     form_id: str, forms_service: Resource, publish: bool, accept_responses: bool
 ) -> None:
@@ -35,6 +38,7 @@ def unpublish_form(form_id: str, forms_service: Resource) -> None:
     )
 
 
+@retry_google_api()
 def give_access_to_organization(
     form_id: str, drive_service: Resource, domain: str = "lll.kpi.ua"
 ) -> None:
