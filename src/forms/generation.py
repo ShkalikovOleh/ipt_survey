@@ -80,10 +80,10 @@ def adapt_form_from_template(
         else:
             stats_quest_loc = section_itemids[0][0]
             section_itemids = [(idx + 1, id) for (idx, id) in section_itemids]
-        append_optional_stats_question(
+        is_appended = append_optional_stats_question(
             teacher, stats_granularity, requests, stats_quest_loc
         )
-        max_loc += 1
+        max_loc += is_appended
 
     if len(roles) == 1:
         insert_loc = (
@@ -325,7 +325,7 @@ def append_optional_stats_question(
     granularity: Granularity,
     requests: list[dict[str, Any]],
     insert_loc: int = 0,
-) -> None:
+) -> bool:
     match granularity:
         case Granularity.GROUP:
             options = [{"value": group.name} for group in teacher.groups]
@@ -337,7 +337,7 @@ def append_optional_stats_question(
             return
 
     if len(options) < 2:
-        return
+        return False
 
     options = sorted(options, key=lambda item: item["value"])
     requests.append(
@@ -358,6 +358,8 @@ def append_optional_stats_question(
             }
         }
     )
+
+    return True
 
 
 def append_optional_chapter_for_role(
