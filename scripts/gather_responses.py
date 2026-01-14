@@ -65,6 +65,9 @@ def gather_responses(
             teacher_df = gather_responses_to_pandas(
                 form_id, forms_service, columns_to_parser
             )
+            if len(teacher_df) == 0:
+                continue
+
             teacher_df.insert(0, "name", name)
             teacher_df.insert(1, "role", str(overall_role))
 
