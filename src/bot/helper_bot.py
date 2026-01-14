@@ -46,12 +46,14 @@ async def get_group_links(
     forms_dict: dict[str, list[dict[str, str]]] = context.bot_data["forms_dict"]
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
 
+    group = Group(context.args[0])
+
     forms_info = fitler_forms_info_by_granularity(
         db=teachers_db,
         forms_dict=forms_dict,
         forms_granularity=forms_granularity,
         requested_granularity=Granularity.GROUP,
-        query=context.args[0],
+        query=group,
     )
     await send_links(update, context, forms_info, forms_granularity, False)
 
@@ -726,12 +728,32 @@ async def reply_text(
     message: str,
     parse_mode: Optional[str] = None,
 ):
-    await context.bot.send_message(
-        chat_id=update.message.chat_id,
-        text=message,
-        reply_to_message_id=update.message.id,
-        parse_mode=parse_mode,
-    )
+    def chunk_text(text: str, max_len: int):
+        start = 0
+        length = len(text)
+
+        while start < length:
+            if length - start <= max_len:
+                yield text[start:]
+                break
+
+            end = start + max_len
+            split_at = text.rfind("\n", start, end)
+
+            if split_at == -1 or split_at <= start:
+                yield text[start:end]
+                start = end
+            else:
+                yield text[start:split_at]
+                start = split_at + 1
+
+    for chunk in chunk_text(message, 4096):
+        await context.bot.send_message(
+            chat_id=update.message.chat_id,
+            text=chunk,
+            reply_to_message_id=update.message.id,
+            parse_mode=parse_mode,
+        )
 
 
 def run_bot(
