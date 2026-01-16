@@ -54,7 +54,7 @@ _op_to_spec_code = {
     Speciality.APPLIED_PHYSICS: "ФФ",
     Speciality.CYBERSECURITY: "ФБE",
 }
-_spec_code_to_spec = {v: k for k, v in _op_to_str.items()}
+_spec_code_to_spec = {v: k for k, v in _op_to_spec_code.items()}
 
 
 @dataclass(eq=True, frozen=True, slots=True)
@@ -69,7 +69,7 @@ class Stream:
     def from_str(value: str) -> "Stream":
         spec_str, year = value.split("-")
         spec = _spec_code_to_spec[spec_str]
-        return Stream(speciality=spec, year=year)
+        return Stream(speciality=spec, year=year[0])
 
 
 @dataclass(eq=True, frozen=True, slots=True)
