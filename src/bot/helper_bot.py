@@ -47,18 +47,18 @@ async def get_group_links(
     forms_granularity: Granularity = context.bot_data["forms_granularity"]
 
     group = Group(context.args[0])
+    for group in sorted(teachers_db.get_all_groups(), key=lambda g: g.name):
+        forms_info = fitler_forms_info_by_granularity(
+            db=teachers_db,
+            forms_dict=forms_dict,
+            forms_granularity=forms_granularity,
+            requested_granularity=Granularity.GROUP,
+            query=group,
+        )
 
-    forms_info = fitler_forms_info_by_granularity(
-        db=teachers_db,
-        forms_dict=forms_dict,
-        forms_granularity=forms_granularity,
-        requested_granularity=Granularity.GROUP,
-        query=group,
-    )
-
-    template = (
-        f"Шановна групо {group.name}!"
-        + """
+        template = (
+            f"Шановна групо {group.name}!"
+            + """
 Студрада НН ФТІ розпочинає **анонімне опитування оцінки якості викладання**. Це можливість чесно поділитися своєю думкою та побачити думки інших.
 
 🔒 **Анонімність**
@@ -78,10 +78,12 @@ async def get_group_links(
 У разі питань чи технічних проблем (форма не доступна, або немає форм для деяких викладачів профільних дисциплін), будь ласка, звертайся до [нас](https://t.me/ipt_bee?direct)
 
 **Дякуємо за час і небайдужість 🤍**
-"""
-    )
+    """
+        )
 
-    await send_links(update, context, forms_info, forms_granularity, False, template)
+        await send_links(
+            update, context, forms_info, forms_granularity, False, template
+        )
 
 
 async def get_stream_links(
@@ -464,9 +466,9 @@ async def send_stats_for_granularity(
 def get_satisfy_emoji(num_responses: int, percent: int):
     if num_responses < MIN_NUM_RESPONSE_TO_PUBLISH:
         emoji = "⛔️"
-    elif percent >= MIN_FRACTION_TO_PUBLISH * 10:
+    elif percent >= MIN_FRACTION_TO_PUBLISH * 100:
         emoji = "✅"
-    elif percent >= (MIN_FRACTION_TO_PUBLISH - 0.05) * 10:
+    elif percent >= (MIN_FRACTION_TO_PUBLISH - 0.05) * 100:
         emoji = "⚠️"
     else:
         emoji = "⛔️"
@@ -483,15 +485,15 @@ def add_optional_stats_info(
     num_per_stats_entity = dict(sorted(num_per_stats_entity.items()))
     stats_messages = []
     for key, num in num_per_stats_entity.items():
-        match stats_granularity:
-            case Granularity.GROUP:
-                stats_query = key
-            case Granularity.STREAM:
-                stats_query = Stream.from_str(key)
-            case Granularity.SPECIALITY:
-                stats_query = Speciality.from_str(key)
-
         if key != "Anonymous":
+            match stats_granularity:
+                case Granularity.GROUP:
+                    stats_query = key
+                case Granularity.STREAM:
+                    stats_query = Stream.from_str(key)
+                case Granularity.SPECIALITY:
+                    stats_query = Speciality.from_str(key)
+
             num_max_gran = get_max_student_for_granularity(
                 stats_granularity, stats_query, teachers_db, teacher_name
             )
@@ -712,7 +714,10 @@ async def sent_need_for_granularity(
             need_messages.append(
                 f"{emoji}{teacher_name} - {total_responses}/{max_num_responses} - ще треба {num_need} загалом"
             )
-            if requested_granularity < Granularity.FACULTY:
+            if (
+                requested_granularity < Granularity.FACULTY
+                and forms_granularity < Granularity.FACULTY
+            ):
                 need_messages.append(
                     f"Серед релевантних до запиту форм: {query_related_tesponses}/{max_query_related_responses}"
                 )
