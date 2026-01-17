@@ -400,6 +400,7 @@ async def send_stats_for_granularity(
                     form["form_id"],
                     forms_service=forms_service,
                     stats_granularity=stats_granularity,
+                    teacher=teachers_db[teacher_name],
                 )
 
                 if (
@@ -656,6 +657,7 @@ async def sent_need_for_granularity(
                     form_info["form_id"],
                     forms_service=forms_service,
                     stats_granularity=stats_granularity,
+                    teacher=teacher,
                 )
 
                 total_responses += total_num_resp
@@ -711,9 +713,15 @@ async def sent_need_for_granularity(
             emoji = get_satisfy_emoji(
                 total_responses, total_responses / max_num_responses * 100
             )
-            need_messages.append(
-                f"{emoji}{teacher_name} - {total_responses}/{max_num_responses} - ще треба {num_need} загалом"
-            )
+            if num_need <= total_responses:
+                need_messages.append(
+                    f"{emoji}{teacher_name} - {total_responses}/{max_num_responses} - ще треба {num_need - total_responses} загалом"
+                )
+            else:
+                need_messages.append(
+                    f"{emoji}{teacher_name} - {total_responses}/{max_num_responses}"
+                )
+
             if (
                 requested_granularity < Granularity.FACULTY
                 and forms_granularity < Granularity.FACULTY

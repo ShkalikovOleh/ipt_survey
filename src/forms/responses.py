@@ -5,8 +5,14 @@ from typing import Any, Optional
 import pandas as pd
 from googleapiclient.discovery import Resource
 
-from src.forms.generation import Granularity, get_form, get_stats_question
+from src.forms.generation import (
+    Granularity,
+    get_form,
+    get_stats_question,
+    get_stats_question_options,
+)
 from src.forms.services import retry_google_api
+from src.teachers_db import Teacher
 
 
 @retry_google_api()
@@ -22,6 +28,7 @@ def get_num_responses(
     form_id: str,
     forms_service: Resource,
     stats_granularity: Optional[Granularity] = None,
+    teacher: Optional[Teacher] = None,
 ) -> tuple[int, dict[str, int]]:
     responses = get_responses(form_id, forms_service)
 
@@ -32,7 +39,12 @@ def get_num_responses(
         stats_question = get_stats_question(stats_granularity)
         id2q = build_id_to_question_map(form_id, forms_service)
         for response in responses:
-            key = "Anonymous"
+            options = get_stats_question_options(teacher, stats_granularity)
+            if stats_granularity < Granularity.FACULTY and len(options) == 1:
+                key = options[0]["value"]
+            else:
+                key = "Anonymous"
+
             for qId, answer_item in response["answers"].items():
                 question = id2q[qId]
                 if question == stats_question:

@@ -321,22 +321,25 @@ def get_stats_question(stats_granularity: Granularity):
     return stats_column
 
 
+def get_stats_question_options(teacher: Teacher, granularity: Granularity) -> list[str]:
+    match granularity:
+        case Granularity.GROUP:
+            return [{"value": group.name} for group in teacher.groups]
+        case Granularity.STREAM:
+            return [{"value": str(stream)} for stream in teacher.streams]
+        case Granularity.SPECIALITY:
+            return [{"value": str(spec)} for spec in teacher.specialities]
+        case Granularity.FACULTY:
+            return []
+
+
 def append_optional_stats_question(
     teacher: Teacher,
     granularity: Granularity,
     requests: list[dict[str, Any]],
     insert_loc: int = 0,
 ) -> bool:
-    match granularity:
-        case Granularity.GROUP:
-            options = [{"value": group.name} for group in teacher.groups]
-        case Granularity.STREAM:
-            options = [{"value": str(stream)} for stream in teacher.streams]
-        case Granularity.SPECIALITY:
-            options = [{"value": str(spec)} for spec in teacher.specialities]
-        case Granularity.FACULTY:
-            return
-
+    options = get_stats_question_options(teacher, granularity)
     if len(options) < 2:
         return False
 
