@@ -38,8 +38,11 @@ def get_num_responses(
     if stats_granularity:
         stats_question = get_stats_question(stats_granularity)
         id2q = build_id_to_question_map(form_id, forms_service)
+        options = get_stats_question_options(teacher, stats_granularity)
+        for opt in options:
+            num_gran_resp[opt] = 0
+
         for response in responses:
-            options = get_stats_question_options(teacher, stats_granularity)
             if stats_granularity < Granularity.FACULTY and len(options) == 1:
                 key = options[0]["value"]
             else:
