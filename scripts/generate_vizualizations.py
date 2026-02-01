@@ -20,7 +20,12 @@ fonts_map = {
     "percent": font_percent,
     "num_resp": font_num_resp,
 }
-color_map = {"background": (19, 20, 2), "text": (255, 255, 255)}
+# color_map = {"background": (19, 20, 2), "text": (255, 255, 255)}
+color_map = {"background": (47, 49, 54), "text": (255, 255, 255)}
+# graph_color = "y"
+# graph_color = (78 / 255, 109 / 255, 181 / 255)
+graph_color = (106 / 255, 150 / 255, 252 / 255)
+backgroud_color = tuple(c / 255 for c in color_map["background"])
 
 WILLING_CONTINUE_TEACHING_COLUMN = "Чи хочете ви, щоб викладач продовжував викладати?"
 SATISFACTION_COLUMN = (
@@ -139,9 +144,18 @@ def generate_vizualization(
     per_continue_teaching = int(np.floor(row[WILLING_CONTINUE_TEACHING_COLUMN] * 100))
 
     template = teacher.overall_role
-    if template == Role.LECTURER:
+    if template == Role.LECTURER or template == Role.BOTH:
         if np.isnan(row["Ставлення викладача до перевірки робіт"]):
             template = "LECTURER_NO_EVAL"
+    if template == Role.BOTH:
+        if np.isnan(row["Доступ до оцінок"]):
+            template = Role.LECTURER
+        elif np.isnan(
+            row[
+                "Узгодженість лекцій і практик (наскільки курси лекцій і практик доповнюють одне одного)"
+            ]
+        ):
+            template = Role.PRACTICE
 
     grade_columns = template_to_columns[template]
     grades = np.array([row[col] for col in grade_columns])
@@ -152,12 +166,16 @@ def generate_vizualization(
         r_paddings=r_pad,
         theta_paddings=theta_pad,
         tight_layout=True,
+        background_color=backgroud_color,
+        plot_color=graph_color,
     )
     spider_plot = convert_matplotlib_fig_to_image(fig_spider)
 
     bar_fig = generate_bar_plot(
         satisfaction_per_grade=row[SATISFACTION_COLUMN],
         self_assesment_per_grade=row[SELF_ASSESMENT_COLUMN],
+        background_color=backgroud_color,
+        plot_color=graph_color,
     )
     bar_plot = convert_matplotlib_fig_to_image(bar_fig)
 
@@ -179,6 +197,7 @@ def generate_vizualization(
         fonts_map=fonts_map,
         color_map=color_map,
         gap_spider_top=template_to_shift[template],
+        semester_label="2025-2026, I семестр",
     )
 
     img.save(os.path.join(save_dir, f"{teacher.name}.png"))

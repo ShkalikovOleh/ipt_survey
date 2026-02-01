@@ -100,8 +100,6 @@ def gather_responses_to_pandas(
         for column in all_columns.difference(filled_columns):
             data[column].append(pd.NA)
 
-    try:
-        df = pd.DataFrame.from_dict(data)
-    except:
-        print(data)
+    df = pd.DataFrame.from_dict(data)
+
     return df

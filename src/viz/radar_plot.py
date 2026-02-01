@@ -188,7 +188,7 @@ def generate_radar_plot(
     # Plot radar graph
     scaled_grades = (grades - start_with_grade_two) / (5 - start_with_grade_two)
     ax.plot(thetas, scaled_grades, color=plot_color)
-    ax.fill(thetas, scaled_grades, facecolor=plot_color, alpha=0.25, label="_nolegend_")
+    ax.fill(thetas, scaled_grades, facecolor=plot_color, alpha=0.3, label="_nolegend_")
 
     for label, angle, r_pad, theta_pad in zip(
         labels, thetas, r_paddings, theta_paddings

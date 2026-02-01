@@ -18,7 +18,11 @@ fonts_map = {
     "percent": font_percent,
     "num_resp": font_num_resp,
 }
-color_map = {"background": (19, 20, 2), "text": (255, 255, 255)}
+# color_map = {"background": (19, 20, 2), "text": (255, 255, 255)}
+color_map = {"background": (47, 49, 54), "text": (255, 255, 255)}
+# graph_color = (78 / 255, 109 / 255, 181 / 255)
+graph_color = (106 / 255, 150 / 255, 252 / 255)
+# graph_color = (96 / 255, 89 / 255, 73 / 255)
 
 # Data
 name = "Surname Name MiddleName"
@@ -42,10 +46,22 @@ num_assestment_per_grades = [0, 0, 1, 2, 15]
 # Radar plot
 r_paddings = [0.1, 0.16, 0.02, 0.17, 0.18, 0.15, 0.02, 0.16]
 theta_paddings = [0, 0, 0.05, 0.075, 0, -0.05, -0.09, 0]
-spider_fig = generate_radar_plot(criteria_grades, criteria, r_paddings, theta_paddings)
+spider_fig = generate_radar_plot(
+    criteria_grades,
+    criteria,
+    r_paddings,
+    theta_paddings,
+    plot_color=graph_color,
+    background_color=(47 / 255, 49 / 255, 54 / 255),
+)
 
 # Bar plots
-bar_fig = generate_bar_plot(num_satisfaction_per_grades, num_assestment_per_grades)
+bar_fig = generate_bar_plot(
+    num_satisfaction_per_grades,
+    num_assestment_per_grades,
+    plot_color=graph_color,
+    background_color=(47 / 255, 49 / 255, 54 / 255),
+)
 
 # Generate full picture with empty photo
 spider_plot = convert_matplotlib_fig_to_image(spider_fig)
