@@ -35,6 +35,7 @@ from src.teachers_db import (
 
 NO_FORMS_RESPONSE = "Жодної форми не знайдено"
 MIN_NUM_RESPONSE_TO_PUBLISH = 5
+UPPER_PUBLISH_THRESHOLD = 15
 MIN_FRACTION_TO_PUBLISH = 0.2
 
 
@@ -467,9 +468,15 @@ async def send_stats_for_granularity(
 def get_satisfy_emoji(num_responses: int, percent: int):
     if num_responses < MIN_NUM_RESPONSE_TO_PUBLISH:
         emoji = "⛔️"
-    elif percent >= MIN_FRACTION_TO_PUBLISH * 100:
+    elif (
+        percent >= MIN_FRACTION_TO_PUBLISH * 100
+        or num_responses >= UPPER_PUBLISH_THRESHOLD
+    ):
         emoji = "✅"
-    elif percent >= (MIN_FRACTION_TO_PUBLISH - 0.05) * 100:
+    elif (
+        percent >= (MIN_FRACTION_TO_PUBLISH - 0.05) * 100
+        or num_responses >= UPPER_PUBLISH_THRESHOLD - 5
+    ):
         emoji = "⚠️"
     else:
         emoji = "⛔️"
@@ -677,7 +684,8 @@ async def sent_need_for_granularity(
             # Check overall
             if (
                 total_responses > MIN_NUM_RESPONSE_TO_PUBLISH
-                and total_responses / max_num_responses >= MIN_FRACTION_TO_PUBLISH
+                and total_responses
+                >= math.floor(MIN_FRACTION_TO_PUBLISH * max_num_responses)
             ):
                 continue
 
@@ -713,7 +721,7 @@ async def sent_need_for_granularity(
             emoji = get_satisfy_emoji(
                 total_responses, total_responses / max_num_responses * 100
             )
-            if num_need <= total_responses:
+            if num_need > total_responses:
                 need_messages.append(
                     f"{emoji}{teacher_name} - {total_responses}/{max_num_responses} - ще треба {num_need - total_responses} загалом"
                 )

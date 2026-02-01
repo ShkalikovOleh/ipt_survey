@@ -8,9 +8,12 @@ from pandas.api.typing import NAType
 def num_responses_filter(
     num_responses: int,
     num_respondents: int,
-    min_fraction: float = 0.2,
+    min_fraction: float = 0.15,
     min_responses: int = 5,
+    min_num_pass: int = 10,
 ) -> bool:
+    if num_responses >= min_num_pass:
+        return True
     if num_responses < min_responses:
         return False
     fraction = num_responses / num_respondents

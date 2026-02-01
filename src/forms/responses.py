@@ -40,7 +40,7 @@ def get_num_responses(
         id2q = build_id_to_question_map(form_id, forms_service)
         options = get_stats_question_options(teacher, stats_granularity)
         for opt in options:
-            num_gran_resp[opt] = 0
+            num_gran_resp[opt["value"]] = 0
 
         for response in responses:
             if stats_granularity < Granularity.FACULTY and len(options) == 1:
@@ -89,14 +89,19 @@ def gather_responses_to_pandas(
         for qId, answer_item in response["answers"].items():
             answer = answer_item["textAnswers"]["answers"][0]["value"]
 
-            question = id2q[qId]
-            filled_columns.add(question)
+            question = id2q.get(qId)
+            if not question:
+                continue
 
             parser = question_parsers.get(question)
             if parser:
+                filled_columns.add(question)
                 data[question].append(parser(answer))
         for column in all_columns.difference(filled_columns):
             data[column].append(pd.NA)
 
-    df = pd.DataFrame.from_dict(data)
+    try:
+        df = pd.DataFrame.from_dict(data)
+    except:
+        print(data)
     return df
