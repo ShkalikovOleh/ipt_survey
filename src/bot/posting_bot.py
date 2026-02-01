@@ -276,7 +276,7 @@ def main(args: Namespace):
     with open(args.cfg_file) as cfg_file:
         cfg = json.load(cfg_file)
 
-    df = pd.read_feather(cfg["survey_results"])
+    df = pd.read_parquet(cfg["survey_results"])
     teachers_db = load_teachers_db(cfg["teachers_info_files"])
 
     if "prev_surveys_links" in cfg:
