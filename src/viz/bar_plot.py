@@ -12,6 +12,7 @@ def generate_bar_plot(
     dpi: int = 100,
     fontsize: int = 18,
     background_color=(19 / 255, 20 / 255, 2 / 255),
+    plot_color="y",
     text_color="white",
     tight_layout: bool = True,
 ) -> Figure:
@@ -46,7 +47,7 @@ def generate_bar_plot(
             fontsize=fontsize + 2,
         )
 
-        ax.bar(np.arange(1, 6), num_per_grade, facecolor="y")
+        ax.bar(np.arange(1, 6), num_per_grade, facecolor=plot_color)
 
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)

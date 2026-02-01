@@ -9,7 +9,10 @@ from src.analysis.aggregators import (
     mean_if_more_than_half,
     merge_two_text_columns,
 )
-from src.analysis.filters import filter_empty_text, filter_swear_language
+from src.analysis.filters import (
+    filter_empty_text,
+    filter_swear_language,
+)
 
 
 def main(raw_df_path: str, out_path: str):
@@ -40,24 +43,27 @@ def main(raw_df_path: str, out_path: str):
         "Відкритий мікрофон. Усе, що ви хочете сказати про викладача, але що не покрив жоден інший пункт": concat_text_answers,
     }
     swear_words = set(
-        "бля",
-        "блядь",
-        "блять",
-        "сука",
-        "пізда",
-        "піздець",
-        "хуй",
-        "нахуй",
-        "нахуя",
-        "жопа",
-        "курва",
-        "мудак",
-        "дебіл",
-        "шлюха",
-        "говно",
-        "лайно",
-        "підор",
-        "підар",
+        [
+            "бля",
+            "блядь",
+            "блять",
+            "сука",
+            "пізда",
+            "піздець",
+            "хуй",
+            "нахуй",
+            "нахуя",
+            "жопа",
+            "курва",
+            "мудак",
+            "дебіл",
+            "шлюха",
+            "говно",
+            "лайно",
+            "підор",
+            "підар",
+            "заїбал",
+        ]
     )
     filter_swear_language_func = partial(filter_swear_language, swear_words=swear_words)
 

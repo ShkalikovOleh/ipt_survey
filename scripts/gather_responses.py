@@ -110,7 +110,7 @@ def add_info_from_stats_question(
                     lambda val: Stream.from_str(val).year,
                     na_action="ignore",
                 )
-                teacher_df.drop([stats_column], axis=0, inplace=True)
+                # teacher_df.drop([stats_column], axis=0, inplace=True)
             case Granularity.SPECIALITY:
                 teacher_df.rename({stats_column: "speciality"})
     else:
