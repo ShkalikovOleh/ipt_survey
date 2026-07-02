@@ -14,6 +14,24 @@ def get_continue_teaching_color(percent: int) -> tuple[int, int, int]:
     return (R, G, 0)
 
 
+def create_photo_mask(img: Image.Image, radius_percent=10):
+    img = img.convert("RGBA")
+    width, height = img.size
+
+    radius = int(min(width, height) * (radius_percent / 100))
+
+    scale = 4
+    mask = Image.new("L", (width * scale, height * scale), 0)
+    draw = ImageDraw.Draw(mask)
+
+    draw.rounded_rectangle(
+        (0, 0, width * scale, height * scale), radius=radius * scale, fill=255
+    )
+
+    mask = mask.resize((width, height), resample=Image.LANCZOS)
+    return mask
+
+
 def generate_survey_result_picture(
     name: str,
     role: Role,
@@ -31,11 +49,13 @@ def generate_survey_result_picture(
     margin: int = 95,
     gap_spider_top: int = 0,
     gap_left_right_part: int = 25,
+    rounded_photo_mask_radius_percent: float = 10,
     semester_label: str = "2024-2025, I семестр",
 ):
     img = Image.new("RGBA", (width, height), color_map["background"])
 
-    img.paste(photo, (margin, margin))
+    mask = create_photo_mask(photo, rounded_photo_mask_radius_percent)
+    img.paste(photo, (margin, margin), mask)
     img.paste(
         spider_plot, (margin + 400 + gap_left_right_part, margin - 75 + gap_spider_top)
     )

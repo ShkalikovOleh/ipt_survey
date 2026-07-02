@@ -10,10 +10,14 @@ from src.viz.radar_plot import generate_radar_plot
 from src.viz.survey_image import generate_survey_result_picture
 from src.viz.utils import convert_matplotlib_fig_to_image
 
-font_name = ImageFont.truetype("DejaVuSans-Bold.ttf", 36)
-font_main = ImageFont.truetype("DejaVuSans.ttf", 32)
-font_num_resp = ImageFont.truetype("DejaVuSans-Bold.ttf", 60)
-font_percent = ImageFont.truetype("DejaVuSans-Bold.ttf", 100)
+# font_name = ImageFont.truetype("DejaVuSans-Bold.ttf", 36)
+# font_main = ImageFont.truetype("DejaVuSans.ttf", 32)
+# font_num_resp = ImageFont.truetype("DejaVuSans-Bold.ttf", 60)
+# font_percent = ImageFont.truetype("DejaVuSans-Bold.ttf", 100)
+font_name = ImageFont.truetype("LiberationMono-Bold.ttf", 36)
+font_main = ImageFont.truetype("LiberationMono-Regular.ttf", 32)
+font_num_resp = ImageFont.truetype("LiberationMono-Bold.ttf", 60)
+font_percent = ImageFont.truetype("LiberationMono-Bold.ttf", 100)
 fonts_map = {
     "name": font_name,
     "text": font_main,
