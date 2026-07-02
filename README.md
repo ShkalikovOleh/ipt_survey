@@ -2,6 +2,11 @@
 
 Source code for all utilities used to conduct a survey about teachers, visualize the results, and automatically post them to a Telegram channel.
 
+## How-to
+
+Detailed documentation for each stage of the survey workflow is available in the project [wiki 📖](https://github.com/ShkalikovOleh/ipt_survey/wiki)
+
+
 ## Features
 
 1. **Distributed Information Gathering**:
